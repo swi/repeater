@@ -8,18 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Config represents the parsed CLI configuration
-type Config struct {
-	Subcommand string
-	Every      time.Duration
-	Times      int64
-	For        time.Duration
-	Command    []string
-	Help       bool
-	Version    bool
-	ConfigFile string
-}
-
 func TestCLIParsing(t *testing.T) {
 	tests := []struct {
 		name     string
