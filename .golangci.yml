@@ -52,7 +52,7 @@ linters-settings:
     locale: US
     
   goimports:
-    local-prefixes: github.com/shaneisley/repeater
+    local-prefixes: github.com/swi/repeater
 
 issues:
   # Exclude some linters from running on tests files

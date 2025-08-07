@@ -11,8 +11,8 @@ This project follows **Test-Driven Development (TDD)** with iterative enhancemen
 
 #### Tasks:
 - [ ] **Repository Setup**
-  - Create GitHub repository: `github.com/shaneisley/repeater`
-  - Initialize Go module: `go mod init github.com/shaneisley/repeater`
+  - Create GitHub repository: `github.com/swi/repeater`
+  - Initialize Go module: `go mod init github.com/swi/repeater`
   - Setup directory structure following Go conventions
   - Configure CI/CD pipeline (GitHub Actions)
 

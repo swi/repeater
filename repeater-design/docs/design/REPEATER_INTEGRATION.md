@@ -163,9 +163,9 @@ import (
     "github.com/shaneisley/patience/pkg/metrics"
     
     // Repeater-specific packages
-    "github.com/shaneisley/repeater/pkg/scheduler"
-    "github.com/shaneisley/repeater/pkg/output"
-    "github.com/shaneisley/repeater/pkg/conditions"
+    "github.com/swi/repeater/pkg/scheduler"
+    "github.com/swi/repeater/pkg/output"
+    "github.com/swi/repeater/pkg/conditions"
 )
 ```
 
@@ -609,7 +609,7 @@ curl -sSL https://install.patience.sh | sh
 
 # Or install separately
 go install github.com/shaneisley/patience@latest
-go install github.com/shaneisley/repeater@latest
+go install github.com/swi/repeater@latest
 ```
 
 #### System Service Integration
