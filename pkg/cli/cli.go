@@ -21,116 +21,170 @@ type Config struct {
 
 // ParseArgs parses command line arguments and returns a Config
 func ParseArgs(args []string) (*Config, error) {
-	config := &Config{}
-
 	if len(args) == 0 {
 		return nil, errors.New("subcommand required")
 	}
 
-	i := 0
+	parser := &argParser{args: args, config: &Config{}}
+	return parser.parse()
+}
 
+// argParser handles the parsing logic
+type argParser struct {
+	args   []string
+	config *Config
+	pos    int
+}
+
+// parse orchestrates the parsing process
+func (p *argParser) parse() (*Config, error) {
 	// Parse global flags first
-	for i < len(args) {
-		arg := args[i]
-
-		if arg == "--help" || arg == "-h" {
-			config.Help = true
-			return config, nil
-		}
-
-		if arg == "--version" || arg == "-v" {
-			config.Version = true
-			return config, nil
-		}
-
-		if arg == "--config" {
-			if i+1 >= len(args) {
-				return nil, errors.New("--config requires a value")
-			}
-			config.ConfigFile = args[i+1]
-			i += 2
-			continue
-		}
-
-		// If not a global flag, break to parse subcommand
-		break
+	if err := p.parseGlobalFlags(); err != nil {
+		return nil, err
 	}
 
-	if i >= len(args) {
-		return nil, errors.New("subcommand required")
+	// Early return for help/version
+	if p.config.Help || p.config.Version {
+		return p.config, nil
 	}
 
 	// Parse subcommand
-	subcommand := args[i]
-	switch subcommand {
-	case "interval", "count", "duration":
-		config.Subcommand = subcommand
-	default:
-		return nil, fmt.Errorf("unknown subcommand: %s", subcommand)
+	if err := p.parseSubcommand(); err != nil {
+		return nil, err
 	}
-	i++
 
 	// Parse subcommand flags
-	var commandStart int = -1
-	for i < len(args) {
-		arg := args[i]
+	if err := p.parseSubcommandFlags(); err != nil {
+		return nil, err
+	}
+
+	// Parse command after --
+	if err := p.parseCommand(); err != nil {
+		return nil, err
+	}
+
+	return p.config, nil
+}
+
+// parseGlobalFlags parses global flags like --help, --version, --config
+func (p *argParser) parseGlobalFlags() error {
+	for p.pos < len(p.args) {
+		arg := p.args[p.pos]
+
+		switch arg {
+		case "--help", "-h":
+			p.config.Help = true
+			return nil
+		case "--version", "-v":
+			p.config.Version = true
+			return nil
+		case "--config":
+			return p.parseConfigFlag()
+		default:
+			// Not a global flag, continue to subcommand parsing
+			return nil
+		}
+	}
+	return nil
+}
+
+// parseConfigFlag parses the --config flag and its value
+func (p *argParser) parseConfigFlag() error {
+	if p.pos+1 >= len(p.args) {
+		return errors.New("--config requires a value")
+	}
+	p.config.ConfigFile = p.args[p.pos+1]
+	p.pos += 2
+	return nil
+}
+
+// parseSubcommand parses and validates the subcommand
+func (p *argParser) parseSubcommand() error {
+	if p.pos >= len(p.args) {
+		return errors.New("subcommand required")
+	}
+
+	subcommand := p.args[p.pos]
+	switch subcommand {
+	case "interval", "count", "duration":
+		p.config.Subcommand = subcommand
+		p.pos++
+		return nil
+	default:
+		return fmt.Errorf("unknown subcommand: %s", subcommand)
+	}
+}
+
+// parseSubcommandFlags parses flags specific to subcommands
+func (p *argParser) parseSubcommandFlags() error {
+	for p.pos < len(p.args) {
+		arg := p.args[p.pos]
 
 		if arg == "--" {
-			commandStart = i + 1
-			break
+			p.pos++ // Skip the separator
+			return nil
 		}
 
 		switch arg {
 		case "--every":
-			if i+1 >= len(args) {
-				return nil, errors.New("--every requires a value")
+			if err := p.parseDurationFlag(&p.config.Every); err != nil {
+				return err
 			}
-			duration, err := time.ParseDuration(args[i+1])
-			if err != nil {
-				return nil, fmt.Errorf("invalid duration: %s", args[i+1])
-			}
-			config.Every = duration
-			i += 2
-
 		case "--times":
-			if i+1 >= len(args) {
-				return nil, errors.New("--times requires a value")
+			if err := p.parseTimesFlag(); err != nil {
+				return err
 			}
-			times, err := strconv.ParseInt(args[i+1], 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid times value: %s", args[i+1])
-			}
-			config.Times = times
-			i += 2
-
 		case "--for":
-			if i+1 >= len(args) {
-				return nil, errors.New("--for requires a value")
+			if err := p.parseDurationFlag(&p.config.For); err != nil {
+				return err
 			}
-			duration, err := time.ParseDuration(args[i+1])
-			if err != nil {
-				return nil, fmt.Errorf("invalid duration: %s", args[i+1])
-			}
-			config.For = duration
-			i += 2
-
 		default:
-			return nil, fmt.Errorf("unknown flag: %s", arg)
+			return fmt.Errorf("unknown flag: %s", arg)
 		}
 	}
+	return nil
+}
 
-	// Parse command after --
-	if commandStart == -1 {
-		return nil, errors.New("command required after --")
+// parseDurationFlag parses a duration flag value
+func (p *argParser) parseDurationFlag(target *time.Duration) error {
+	if p.pos+1 >= len(p.args) {
+		return fmt.Errorf("%s requires a value", p.args[p.pos])
 	}
 
-	if commandStart >= len(args) {
-		return nil, errors.New("command required after --")
+	duration, err := time.ParseDuration(p.args[p.pos+1])
+	if err != nil {
+		return fmt.Errorf("invalid duration: %s", p.args[p.pos+1])
 	}
 
-	config.Command = args[commandStart:]
+	*target = duration
+	p.pos += 2
+	return nil
+}
 
-	return config, nil
+// parseTimesFlag parses the --times flag value
+func (p *argParser) parseTimesFlag() error {
+	if p.pos+1 >= len(p.args) {
+		return errors.New("--times requires a value")
+	}
+
+	times, err := strconv.ParseInt(p.args[p.pos+1], 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid times value: %s", p.args[p.pos+1])
+	}
+
+	p.config.Times = times
+	p.pos += 2
+	return nil
+}
+
+// parseCommand parses the command after the -- separator
+func (p *argParser) parseCommand() error {
+	if p.pos >= len(p.args) {
+		return errors.New("command required after --")
+	}
+
+	p.config.Command = p.args[p.pos:]
+	return nil
 }
 
 // ValidateConfig validates the parsed configuration
