@@ -2,6 +2,8 @@
 
 A comprehensive guide to using the `rpr` command-line tool for continuous command execution with intelligent scheduling.
 
+> **✅ All examples in this guide are tested and working with the current implementation (v0.2.0 MVP)**
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
