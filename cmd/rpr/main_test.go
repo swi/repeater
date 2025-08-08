@@ -128,3 +128,59 @@ func TestShowExecutionInfoAdaptive(t *testing.T) {
 	// For now, this will not show adaptive-specific info (RED phase)
 	// Once implemented, we should see adaptive scheduling information
 }
+
+// TestBackoffSubcommandIntegration tests the integration between CLI and backoff scheduler
+func TestBackoffSubcommandIntegration(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantErr  bool
+		validate func(t *testing.T, config *cli.Config)
+	}{
+		{
+			name: "backoff subcommand creates backoff scheduler",
+			args: []string{"backoff", "--initial", "100ms", "--max", "5s", "--times", "2", "--", "echo", "test"},
+			validate: func(t *testing.T, config *cli.Config) {
+				assert.Equal(t, "backoff", config.Subcommand)
+				assert.Equal(t, 100*time.Millisecond, config.InitialInterval)
+				assert.Equal(t, 5*time.Second, config.BackoffMax)
+				assert.Equal(t, []string{"echo", "test"}, config.Command)
+				assert.Equal(t, int64(2), config.Times)
+			},
+		},
+		{
+			name: "backoff with custom parameters",
+			args: []string{"backoff", "--initial", "200ms", "--max", "10s", "--multiplier", "1.5", "--jitter", "0.1", "--times", "1", "--", "echo", "backoff-test"},
+			validate: func(t *testing.T, config *cli.Config) {
+				assert.Equal(t, "backoff", config.Subcommand)
+				assert.Equal(t, 200*time.Millisecond, config.InitialInterval)
+				assert.Equal(t, 10*time.Second, config.BackoffMax)
+				assert.Equal(t, 1.5, config.BackoffMultiplier)
+				assert.Equal(t, 0.1, config.BackoffJitter)
+				assert.Equal(t, int64(1), config.Times)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse args
+			config, err := cli.ParseArgs(tt.args)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NoError(t, cli.ValidateConfig(config))
+
+			// Validate config
+			if tt.validate != nil {
+				tt.validate(t, config)
+			}
+
+			// Test execution
+			err = executeCommand(config)
+			assert.NoError(t, err, "backoff subcommand should be handled by executeCommand")
+		})
+	}
+}
