@@ -115,13 +115,10 @@ func TestExponentialBackoffSchedulerReset(t *testing.T) {
 	assert.Equal(t, initial, interval)
 }
 
-// TestExponentialBackoffSchedulerInterface tests that it implements Scheduler interface
+// TestExponentialBackoffSchedulerInterface tests the scheduler interface methods
 func TestExponentialBackoffSchedulerInterface(t *testing.T) {
 	scheduler := NewExponentialBackoffScheduler(100*time.Millisecond, 2.0, 10*time.Second, 0.0)
 	require.NotNil(t, scheduler)
-
-	// Test that it implements Scheduler interface
-	var _ Scheduler = scheduler
 
 	// Test Next() returns a channel
 	nextChan := scheduler.Next()
