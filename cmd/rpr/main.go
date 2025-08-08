@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/swi/repeater/pkg/cli"
+	"github.com/swi/repeater/pkg/runner"
 )
 
-const version = "0.1.0-dev"
+const version = "0.2.0"
 
 func main() {
 	config, err := cli.ParseArgs(os.Args[1:])
@@ -33,16 +38,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Execute based on subcommand
-	switch config.Subcommand {
-	case "interval":
-		executeInterval(config)
-	case "count":
-		executeCount(config)
-	case "duration":
-		executeDuration(config)
-	default:
-		fmt.Fprintf(os.Stderr, "Error: unknown subcommand: %s\n", config.Subcommand)
+	// Execute using the integrated runner system
+	if err := executeCommand(config); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -83,32 +81,79 @@ func showVersion() {
 	fmt.Printf("rpr version %s\n", version)
 }
 
-func executeInterval(config *cli.Config) {
-	fmt.Printf("🕐 Interval execution: every %v", config.Every)
-	if config.Times > 0 {
-		fmt.Printf(", %d times", config.Times)
+func executeCommand(config *cli.Config) error {
+	// Create runner
+	r, err := runner.NewRunner(config)
+	if err != nil {
+		return fmt.Errorf("failed to create runner: %w", err)
 	}
-	if config.For > 0 {
-		fmt.Printf(", for %v", config.For)
+
+	// Setup signal handling for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		fmt.Fprintf(os.Stderr, "\n🛑 Received interrupt signal, shutting down gracefully...\n")
+		cancel()
+	}()
+
+	// Show execution info
+	showExecutionInfo(config)
+
+	// Run the command
+	stats, err := r.Run(ctx)
+	if err != nil && ctx.Err() == nil {
+		// Error that's not from cancellation
+		return fmt.Errorf("execution failed: %w", err)
 	}
-	fmt.Printf("\n📋 Command: %v\n", config.Command)
-	fmt.Println("⚠️  Scheduler implementation coming next in TDD cycle...")
+
+	// Show results
+	showExecutionResults(stats)
+	return nil
 }
 
-func executeCount(config *cli.Config) {
-	fmt.Printf("🔢 Count execution: %d times", config.Times)
-	if config.Every > 0 {
-		fmt.Printf(", every %v", config.Every)
+func showExecutionInfo(config *cli.Config) {
+	switch config.Subcommand {
+	case "interval":
+		fmt.Printf("🕐 Interval execution: every %v", config.Every)
+		if config.Times > 0 {
+			fmt.Printf(", %d times", config.Times)
+		}
+		if config.For > 0 {
+			fmt.Printf(", for %v", config.For)
+		}
+	case "count":
+		fmt.Printf("🔢 Count execution: %d times", config.Times)
+		if config.Every > 0 {
+			fmt.Printf(", every %v", config.Every)
+		}
+	case "duration":
+		fmt.Printf("⏱️  Duration execution: for %v", config.For)
+		if config.Every > 0 {
+			fmt.Printf(", every %v", config.Every)
+		}
 	}
 	fmt.Printf("\n📋 Command: %v\n", config.Command)
-	fmt.Println("⚠️  Scheduler implementation coming next in TDD cycle...")
+	fmt.Println("🚀 Starting execution...")
 }
 
-func executeDuration(config *cli.Config) {
-	fmt.Printf("⏱️  Duration execution: for %v", config.For)
-	if config.Every > 0 {
-		fmt.Printf(", every %v", config.Every)
+func showExecutionResults(stats *runner.ExecutionStats) {
+	if stats == nil {
+		return
 	}
-	fmt.Printf("\n📋 Command: %v\n", config.Command)
-	fmt.Println("⚠️  Scheduler implementation coming next in TDD cycle...")
+
+	fmt.Printf("\n✅ Execution completed!\n")
+	fmt.Printf("📊 Statistics:\n")
+	fmt.Printf("   Total executions: %d\n", stats.TotalExecutions)
+	fmt.Printf("   Successful: %d\n", stats.SuccessfulExecutions)
+	fmt.Printf("   Failed: %d\n", stats.FailedExecutions)
+	fmt.Printf("   Duration: %v\n", stats.Duration.Round(time.Millisecond))
+
+	if stats.FailedExecutions > 0 {
+		fmt.Printf("\n⚠️  Some executions failed. Check command output above.\n")
+	}
 }
