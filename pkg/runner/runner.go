@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/swi/repeater/pkg/cli"
 	"github.com/swi/repeater/pkg/executor"
+	"github.com/swi/repeater/pkg/ratelimit"
 	"github.com/swi/repeater/pkg/scheduler"
 )
 
@@ -61,6 +63,10 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 	case "duration":
 		if config.For == 0 {
 			return nil, errors.New("duration requires --for")
+		}
+	case "rate-limit":
+		if config.RateSpec == "" {
+			return nil, errors.New("rate-limit requires --rate")
 		}
 	default:
 		return nil, errors.New("unknown subcommand: " + config.Subcommand)
@@ -175,6 +181,83 @@ type Scheduler interface {
 	Stop()
 }
 
+// RateLimitScheduler implements Scheduler using Diophantine rate limiting
+type RateLimitScheduler struct {
+	limiter  *ratelimit.DiophantineRateLimiter
+	showNext bool
+	nextChan chan time.Time
+	stopChan chan struct{}
+	stopped  bool
+	started  bool
+}
+
+// NewRateLimitScheduler creates a new rate-limit aware scheduler
+func NewRateLimitScheduler(limiter *ratelimit.DiophantineRateLimiter, showNext bool) *RateLimitScheduler {
+	s := &RateLimitScheduler{
+		limiter:  limiter,
+		showNext: showNext,
+		nextChan: make(chan time.Time, 1),
+		stopChan: make(chan struct{}),
+		stopped:  false,
+		started:  false,
+	}
+
+	// Start the scheduling goroutine immediately
+	go s.scheduleLoop()
+
+	return s
+}
+
+// Next returns a channel that delivers the next allowed execution time
+func (s *RateLimitScheduler) Next() <-chan time.Time {
+	return s.nextChan
+}
+
+// scheduleLoop continuously schedules the next allowed execution
+func (s *RateLimitScheduler) scheduleLoop() {
+	for {
+		select {
+		case <-s.stopChan:
+			return
+		default:
+			if s.limiter.Allow() {
+				// Request is allowed now
+				select {
+				case s.nextChan <- time.Now():
+					// Successfully sent, continue to next iteration
+				case <-s.stopChan:
+					return
+				}
+			} else {
+				// Request not allowed, wait until next allowed time
+				nextTime := s.limiter.NextAllowedTime()
+				if s.showNext {
+					fmt.Printf("Next request allowed at: %s\n", nextTime.Format("15:04:05"))
+				}
+
+				// Wait until that time
+				waitDuration := time.Until(nextTime)
+				if waitDuration > 0 {
+					select {
+					case <-time.After(waitDuration):
+						// Continue loop to try again
+					case <-s.stopChan:
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+// Stop stops the scheduler
+func (s *RateLimitScheduler) Stop() {
+	if !s.stopped {
+		close(s.stopChan)
+		s.stopped = true
+	}
+}
+
 // createScheduler creates the appropriate scheduler based on the subcommand
 func (r *Runner) createScheduler() (Scheduler, error) {
 	const immediateInterval = 1 * time.Millisecond
@@ -190,9 +273,58 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 			interval = immediateInterval // Immediate execution for count/duration without --every
 		}
 		return scheduler.NewIntervalScheduler(interval, noJitter, immediateStart)
+	case "rate-limit":
+		return r.createRateLimitScheduler()
 	default:
 		return nil, fmt.Errorf("unknown subcommand: %s", r.config.Subcommand)
 	}
+}
+
+// createRateLimitScheduler creates a rate-limit aware scheduler
+func (r *Runner) createRateLimitScheduler() (Scheduler, error) {
+	// Parse rate specification
+	rate, period, err := ratelimit.ParseRateSpec(r.config.RateSpec)
+	if err != nil {
+		return nil, fmt.Errorf("invalid rate spec: %w", err)
+	}
+
+	// Parse retry pattern if provided
+	var retryPattern []time.Duration
+	if r.config.RetryPattern != "" {
+		retryPattern, err = r.parseRetryPattern(r.config.RetryPattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid retry pattern: %w", err)
+		}
+	} else {
+		retryPattern = []time.Duration{0} // Default: single attempt, no retries
+	}
+
+	// Create Diophantine rate limiter
+	limiter := ratelimit.NewDiophantineRateLimiter(rate, period, retryPattern)
+
+	// Create a scheduler that respects the rate limiter
+	return NewRateLimitScheduler(limiter, r.config.ShowNext), nil
+}
+
+// parseRetryPattern parses retry pattern string like "0,10m,30m"
+func (r *Runner) parseRetryPattern(pattern string) ([]time.Duration, error) {
+	parts := strings.Split(pattern, ",")
+	retryPattern := make([]time.Duration, len(parts))
+
+	for i, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "0" {
+			retryPattern[i] = 0
+		} else {
+			duration, err := time.ParseDuration(part)
+			if err != nil {
+				return nil, fmt.Errorf("invalid retry offset '%s': %w", part, err)
+			}
+			retryPattern[i] = duration
+		}
+	}
+
+	return retryPattern, nil
 }
 
 // createExecutionContext creates a context with appropriate timeouts
