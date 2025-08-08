@@ -61,6 +61,7 @@ func showHelp() {
 	fmt.Println("  count, cnt, c          Execute command a specific number of times")
 	fmt.Println("  duration, dur, d       Execute command for a specific duration")
 	fmt.Println("  rate-limit, rate, rl   Execute command with server-friendly rate limiting")
+	fmt.Println("  adaptive, adapt, a     Execute command with adaptive scheduling")
 	fmt.Println()
 	fmt.Println("COMMON OPTIONS:")
 	fmt.Println("  --every, -e DURATION       Interval between executions")
@@ -69,6 +70,8 @@ func showHelp() {
 	fmt.Println("  --rate, -r SPEC            Rate specification (e.g., 10/1h, 100/1m)")
 	fmt.Println("  --retry-pattern, -p SPEC   Retry pattern (e.g., 0,10m,30m)")
 	fmt.Println("  --show-next, -n            Show next allowed execution time")
+	fmt.Println("  --base-interval, -b DUR    Base interval for adaptive scheduling")
+	fmt.Println("  --show-metrics, -m         Show adaptive scheduling metrics")
 	fmt.Println()
 	fmt.Println("EXAMPLES:")
 	fmt.Println("  rpr interval --every 30s --times 10 -- curl http://example.com")
@@ -80,6 +83,8 @@ func showHelp() {
 	fmt.Println("  rpr rate-limit --rate 100/1h -- curl https://api.github.com/user")
 	fmt.Println("  rpr rl -r 10/1m --retry-pattern 0,5m,15m -- curl api.com")
 	fmt.Println("  rpr rate-limit -r 60/1h --show-next -- curl api.example.com")
+	fmt.Println("  rpr adaptive --base-interval 1s --show-metrics -- curl api.com")
+	fmt.Println("  rpr a -b 500ms --times 10 -- echo 'adaptive test'")
 	fmt.Println()
 	fmt.Println("For more information, see: https://github.com/swi/repeater")
 }
@@ -142,6 +147,14 @@ func showExecutionInfo(config *cli.Config) {
 		fmt.Printf("⏱️  Duration execution: for %v", config.For)
 		if config.Every > 0 {
 			fmt.Printf(", every %v", config.Every)
+		}
+	case "adaptive":
+		fmt.Printf("🧠 Adaptive execution: base interval %v", config.BaseInterval)
+		if config.MinInterval > 0 {
+			fmt.Printf(", range %v-%v", config.MinInterval, config.MaxInterval)
+		}
+		if config.ShowMetrics {
+			fmt.Printf(", with metrics")
 		}
 	}
 	fmt.Printf("\n📋 Command: %v\n", config.Command)
