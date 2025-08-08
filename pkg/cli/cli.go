@@ -23,6 +23,15 @@ type Config struct {
 	RateSpec     string // e.g., "10/1h", "100/1m"
 	RetryPattern string // e.g., "0,10m,30m"
 	ShowNext     bool   // show next allowed time
+
+	// Adaptive scheduling fields
+	BaseInterval     time.Duration // base interval for adaptation
+	MinInterval      time.Duration // minimum interval bound
+	MaxInterval      time.Duration // maximum interval bound
+	SlowThreshold    float64       // threshold for slow response (multiplier)
+	FastThreshold    float64       // threshold for fast response (multiplier)
+	FailureThreshold float64       // circuit breaker failure threshold
+	ShowMetrics      bool          // show adaptive metrics
 }
 
 // ParseArgs parses command line arguments and returns a Config
@@ -136,6 +145,9 @@ func normalizeSubcommand(cmd string) string {
 	// Rate limit variations
 	case "rate-limit", "rate", "rl", "r":
 		return "rate-limit"
+	// Adaptive variations
+	case "adaptive", "adapt", "a":
+		return "adaptive"
 	default:
 		return ""
 	}
@@ -174,6 +186,33 @@ func (p *argParser) parseSubcommandFlags() error {
 			}
 		case "--show-next", "-n":
 			p.config.ShowNext = true
+			p.pos++
+		case "--base-interval", "-b":
+			if err := p.parseDurationFlag(&p.config.BaseInterval); err != nil {
+				return err
+			}
+		case "--min-interval":
+			if err := p.parseDurationFlag(&p.config.MinInterval); err != nil {
+				return err
+			}
+		case "--max-interval":
+			if err := p.parseDurationFlag(&p.config.MaxInterval); err != nil {
+				return err
+			}
+		case "--slow-threshold":
+			if err := p.parseFloatFlag(&p.config.SlowThreshold); err != nil {
+				return err
+			}
+		case "--fast-threshold":
+			if err := p.parseFloatFlag(&p.config.FastThreshold); err != nil {
+				return err
+			}
+		case "--failure-threshold":
+			if err := p.parseFloatFlag(&p.config.FailureThreshold); err != nil {
+				return err
+			}
+		case "--show-metrics", "-m":
+			p.config.ShowMetrics = true
 			p.pos++
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
@@ -225,6 +264,22 @@ func (p *argParser) parseStringFlag(target *string) error {
 	return nil
 }
 
+// parseFloatFlag parses a float flag value
+func (p *argParser) parseFloatFlag(target *float64) error {
+	if p.pos+1 >= len(p.args) {
+		return fmt.Errorf("%s requires a value", p.args[p.pos])
+	}
+
+	value, err := strconv.ParseFloat(p.args[p.pos+1], 64)
+	if err != nil {
+		return fmt.Errorf("invalid float value: %s", p.args[p.pos+1])
+	}
+
+	*target = value
+	p.pos += 2
+	return nil
+}
+
 // parseCommand parses the command after the -- separator
 func (p *argParser) parseCommand() error {
 	if p.pos >= len(p.args) {
@@ -271,6 +326,14 @@ func ValidateConfig(config *Config) error {
 		if err := validateRateSpec(config.RateSpec); err != nil {
 			return fmt.Errorf("invalid rate spec: %w", err)
 		}
+	case "adaptive":
+		if config.BaseInterval == 0 {
+			return errors.New("--base-interval is required for adaptive subcommand")
+		}
+		// Validate adaptive configuration
+		if err := validateAdaptiveConfig(config); err != nil {
+			return fmt.Errorf("invalid adaptive config: %w", err)
+		}
 	}
 
 	return nil
@@ -302,6 +365,49 @@ func validateRateSpec(spec string) error {
 	// Validate period part is a valid duration
 	if _, err := time.ParseDuration(strings.TrimSpace(parts[1])); err != nil {
 		return fmt.Errorf("invalid period duration: %s", parts[1])
+	}
+
+	return nil
+}
+
+// validateAdaptiveConfig validates the adaptive configuration
+func validateAdaptiveConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.MinInterval == 0 {
+		config.MinInterval = 100 * time.Millisecond
+	}
+	if config.MaxInterval == 0 {
+		config.MaxInterval = 30 * time.Second
+	}
+	if config.SlowThreshold == 0 {
+		config.SlowThreshold = 2.0
+	}
+	if config.FastThreshold == 0 {
+		config.FastThreshold = 0.5
+	}
+	if config.FailureThreshold == 0 {
+		config.FailureThreshold = 0.3
+	}
+
+	// Validate bounds
+	if config.MinInterval >= config.MaxInterval {
+		return errors.New("min-interval must be less than max-interval")
+	}
+
+	if config.BaseInterval < config.MinInterval || config.BaseInterval > config.MaxInterval {
+		return errors.New("base-interval must be between min-interval and max-interval")
+	}
+
+	if config.SlowThreshold <= 1.0 {
+		return errors.New("slow-threshold must be greater than 1.0")
+	}
+
+	if config.FastThreshold <= 0 || config.FastThreshold >= 1.0 {
+		return errors.New("fast-threshold must be between 0 and 1.0")
+	}
+
+	if config.FailureThreshold <= 0 || config.FailureThreshold >= 1.0 {
+		return errors.New("failure-threshold must be between 0 and 1.0")
 	}
 
 	return nil
