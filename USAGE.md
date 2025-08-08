@@ -5,6 +5,7 @@ A comprehensive guide to using the `rpr` command-line tool for continuous comman
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Command Abbreviations](#command-abbreviations)
 - [Basic Commands](#basic-commands)
   - [Interval Execution](#interval-execution)
   - [Count-Based Execution](#count-based-execution)
@@ -31,6 +32,55 @@ rpr [GLOBAL OPTIONS] <SUBCOMMAND> [OPTIONS] -- <COMMAND>
 - Use `--` to separate repeater options from the command you want to run
 - Commands are executed exactly as you would run them manually
 - All output is preserved and displayed in real-time
+
+## Command Abbreviations
+
+Repeater supports multiple levels of abbreviations for faster typing:
+
+### Subcommand Abbreviations
+
+| Full Command | Primary | Minimal | Example |
+|--------------|---------|---------|---------|
+| `interval` | `int` | `i` | `rpr i -e 30s -- curl api.com` |
+| `count` | `cnt` | `c` | `rpr c -t 5 -- echo hello` |
+| `duration` | `dur` | `d` | `rpr d -f 1m -- date` |
+
+### Flag Abbreviations
+
+| Full Flag | Short | Example |
+|-----------|-------|---------|
+| `--every DURATION` | `-e DURATION` | `-e 30s` |
+| `--times COUNT` | `-t COUNT` | `-t 10` |
+| `--for DURATION` | `-f DURATION` | `-f 2m` |
+
+### Abbreviation Examples
+
+**Ultra-compact form:**
+```bash
+# Instead of: rpr interval --every 30s --times 5 -- curl http://api.com
+rpr i -e 30s -t 5 -- curl http://api.com
+```
+
+**Mixed abbreviations:**
+```bash
+# Primary subcommand with short flags
+rpr int -e 1m -f 10m -- ./health-check.sh
+
+# Minimal subcommand with full flags  
+rpr c --times 100 --every 5s -- npm test
+```
+
+**Power user shortcuts:**
+```bash
+# Monitor API every 10 seconds for 5 minutes
+rpr i -e 10s -f 5m -- curl -f https://api.example.com/health
+
+# Run tests 50 times with 2-second intervals
+rpr c -t 50 -e 2s -- go test ./...
+
+# Check disk space every minute for an hour
+rpr d -f 1h -e 1m -- df -h /
+```
 
 ## Basic Commands
 
@@ -189,18 +239,24 @@ rpr interval --every 10s --times 20 -- curl -f --max-time 5 https://unreliable-a
 ```bash
 # Check every 30 seconds for 1 hour
 rpr duration --for 1h --every 30s -- curl -f -s -o /dev/null https://mysite.com
+# Abbreviated form:
+rpr d -f 1h -e 30s -- curl -f -s -o /dev/null https://mysite.com
 ```
 
 **Database connection testing:**
 ```bash
 # Test connection 10 times with 5-second intervals
 rpr count --times 10 --every 5s -- mysql -h db.example.com -u user -p -e "SELECT 1"
+# Abbreviated form:
+rpr c -t 10 -e 5s -- mysql -h db.example.com -u user -p -e "SELECT 1"
 ```
 
 **SSL certificate expiration check:**
 ```bash
 # Check daily for a week
 rpr interval --every 24h --times 7 -- openssl s_client -connect example.com:443 -servername example.com < /dev/null 2>/dev/null | openssl x509 -noout -dates
+# Abbreviated form:
+rpr i -e 24h -t 7 -- openssl s_client -connect example.com:443 -servername example.com < /dev/null 2>/dev/null | openssl x509 -noout -dates
 ```
 
 ### Development & Testing

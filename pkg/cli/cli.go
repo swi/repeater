@@ -105,13 +105,30 @@ func (p *argParser) parseSubcommand() error {
 	}
 
 	subcommand := p.args[p.pos]
-	switch subcommand {
-	case "interval", "count", "duration":
-		p.config.Subcommand = subcommand
-		p.pos++
-		return nil
-	default:
+	normalizedSubcommand := normalizeSubcommand(subcommand)
+	if normalizedSubcommand == "" {
 		return fmt.Errorf("unknown subcommand: %s", subcommand)
+	}
+
+	p.config.Subcommand = normalizedSubcommand
+	p.pos++
+	return nil
+}
+
+// normalizeSubcommand converts abbreviations to full subcommand names
+func normalizeSubcommand(cmd string) string {
+	switch cmd {
+	// Interval variations
+	case "interval", "int", "i":
+		return "interval"
+	// Count variations
+	case "count", "cnt", "c":
+		return "count"
+	// Duration variations
+	case "duration", "dur", "d":
+		return "duration"
+	default:
+		return ""
 	}
 }
 
@@ -126,15 +143,15 @@ func (p *argParser) parseSubcommandFlags() error {
 		}
 
 		switch arg {
-		case "--every":
+		case "--every", "-e":
 			if err := p.parseDurationFlag(&p.config.Every); err != nil {
 				return err
 			}
-		case "--times":
+		case "--times", "-t":
 			if err := p.parseTimesFlag(); err != nil {
 				return err
 			}
-		case "--for":
+		case "--for", "-f":
 			if err := p.parseDurationFlag(&p.config.For); err != nil {
 				return err
 			}
