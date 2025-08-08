@@ -497,3 +497,120 @@ func TestMixedAbbreviations(t *testing.T) {
 		})
 	}
 }
+
+// TestAdaptiveSubcommand tests the new adaptive subcommand parsing
+func TestAdaptiveSubcommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected Config
+		wantErr  bool
+	}{
+		{
+			name: "adaptive with basic base interval",
+			args: []string{"adaptive", "--base-interval", "1s", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:       "adaptive",
+				BaseInterval:     time.Second,
+				MinInterval:      100 * time.Millisecond, // default
+				MaxInterval:      30 * time.Second,       // default
+				SlowThreshold:    2.0,                    // default
+				FastThreshold:    0.5,                    // default
+				FailureThreshold: 0.3,                    // default
+				Command:          []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "adaptive with all parameters",
+			args: []string{"adaptive", "--base-interval", "2s", "--min-interval", "500ms",
+				"--max-interval", "1m", "--slow-threshold", "3.0", "--fast-threshold", "0.3",
+				"--failure-threshold", "0.2", "--show-metrics", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:       "adaptive",
+				BaseInterval:     2 * time.Second,
+				MinInterval:      500 * time.Millisecond,
+				MaxInterval:      time.Minute,
+				SlowThreshold:    3.0,
+				FastThreshold:    0.3,
+				FailureThreshold: 0.2,
+				ShowMetrics:      true,
+				Command:          []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "adaptive abbreviations",
+			args: []string{"adapt", "-b", "1s", "-m", "--", "echo", "test"},
+			expected: Config{
+				Subcommand:       "adaptive",
+				BaseInterval:     time.Second,
+				MinInterval:      100 * time.Millisecond, // default
+				MaxInterval:      30 * time.Second,       // default
+				SlowThreshold:    2.0,                    // default
+				FastThreshold:    0.5,                    // default
+				FailureThreshold: 0.3,                    // default
+				ShowMetrics:      true,
+				Command:          []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "adaptive minimal abbreviation",
+			args: []string{"a", "-b", "500ms", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:       "adaptive",
+				BaseInterval:     500 * time.Millisecond,
+				MinInterval:      100 * time.Millisecond, // default
+				MaxInterval:      30 * time.Second,       // default
+				SlowThreshold:    2.0,                    // default
+				FastThreshold:    0.5,                    // default
+				FailureThreshold: 0.3,                    // default
+				Command:          []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "adaptive missing base interval",
+			args:    []string{"adaptive", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+		{
+			name:    "adaptive invalid min > max",
+			args:    []string{"adaptive", "-b", "1s", "--min-interval", "2s", "--max-interval", "1s", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+		{
+			name:    "adaptive invalid threshold",
+			args:    []string{"adaptive", "-b", "1s", "--slow-threshold", "0.5", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := ParseArgs(tt.args)
+
+			if tt.wantErr {
+				// For error cases, check both parsing and validation
+				if err == nil {
+					err = ValidateConfig(config)
+				}
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NoError(t, ValidateConfig(config))
+			assert.Equal(t, tt.expected.Subcommand, config.Subcommand)
+			assert.Equal(t, tt.expected.BaseInterval, config.BaseInterval)
+			assert.Equal(t, tt.expected.MinInterval, config.MinInterval)
+			assert.Equal(t, tt.expected.MaxInterval, config.MaxInterval)
+			assert.Equal(t, tt.expected.SlowThreshold, config.SlowThreshold)
+			assert.Equal(t, tt.expected.FastThreshold, config.FastThreshold)
+			assert.Equal(t, tt.expected.FailureThreshold, config.FailureThreshold)
+			assert.Equal(t, tt.expected.ShowMetrics, config.ShowMetrics)
+			assert.Equal(t, tt.expected.Command, config.Command)
+		})
+	}
+}

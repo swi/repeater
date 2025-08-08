@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/swi/repeater/pkg/adaptive"
 	"github.com/swi/repeater/pkg/cli"
 	"github.com/swi/repeater/pkg/executor"
 	"github.com/swi/repeater/pkg/ratelimit"
@@ -67,6 +68,10 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 	case "rate-limit":
 		if config.RateSpec == "" {
 			return nil, errors.New("rate-limit requires --rate")
+		}
+	case "adaptive":
+		if config.BaseInterval == 0 {
+			return nil, errors.New("adaptive requires --base-interval")
 		}
 	default:
 		return nil, errors.New("unknown subcommand: " + config.Subcommand)
@@ -168,6 +173,16 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 			stats.Executions = append(stats.Executions, record)
 			stats.TotalExecutions++
 			executionNumber++
+
+			// Update adaptive scheduler if applicable
+			if adaptiveWrapper, ok := sched.(*AdaptiveSchedulerWrapper); ok {
+				adaptiveWrapper.UpdateFromExecution(record)
+
+				// Show metrics if requested
+				if r.config.ShowMetrics {
+					r.showAdaptiveMetrics(adaptiveWrapper.GetMetrics())
+				}
+			}
 
 			// Update tick time for scheduler
 			_ = tick
@@ -275,6 +290,8 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 		return scheduler.NewIntervalScheduler(interval, noJitter, immediateStart)
 	case "rate-limit":
 		return r.createRateLimitScheduler()
+	case "adaptive":
+		return r.createAdaptiveScheduler()
 	default:
 		return nil, fmt.Errorf("unknown subcommand: %s", r.config.Subcommand)
 	}
@@ -351,4 +368,144 @@ func (r *Runner) shouldStop(stats *ExecutionStats, startTime time.Time) bool {
 	}
 
 	return false
+}
+
+// AdaptiveSchedulerWrapper wraps adaptive.AdaptiveScheduler to implement Scheduler interface
+type AdaptiveSchedulerWrapper struct {
+	scheduler *adaptive.AdaptiveScheduler
+	config    *cli.Config
+	nextChan  chan time.Time
+	stopChan  chan struct{}
+	stopped   bool
+}
+
+// NewAdaptiveSchedulerWrapper creates a new adaptive scheduler wrapper
+func NewAdaptiveSchedulerWrapper(scheduler *adaptive.AdaptiveScheduler, config *cli.Config) *AdaptiveSchedulerWrapper {
+	w := &AdaptiveSchedulerWrapper{
+		scheduler: scheduler,
+		config:    config,
+		nextChan:  make(chan time.Time, 1),
+		stopChan:  make(chan struct{}),
+		stopped:   false,
+	}
+
+	// Start the scheduling goroutine
+	go w.scheduleLoop()
+
+	return w
+}
+
+// Next returns a channel that delivers the next execution time
+func (w *AdaptiveSchedulerWrapper) Next() <-chan time.Time {
+	return w.nextChan
+}
+
+// scheduleLoop continuously schedules the next execution based on adaptive intervals
+func (w *AdaptiveSchedulerWrapper) scheduleLoop() {
+	for {
+		select {
+		case <-w.stopChan:
+			return
+		default:
+			// Get current interval from adaptive scheduler
+			interval := w.scheduler.GetCurrentInterval()
+
+			// Wait for the interval
+			select {
+			case <-time.After(interval):
+				// Send next execution time
+				select {
+				case w.nextChan <- time.Now():
+					// Successfully sent, continue to next iteration
+				case <-w.stopChan:
+					return
+				}
+			case <-w.stopChan:
+				return
+			}
+		}
+	}
+}
+
+// Stop stops the scheduler
+func (w *AdaptiveSchedulerWrapper) Stop() {
+	if !w.stopped {
+		close(w.stopChan)
+		w.stopped = true
+	}
+}
+
+// UpdateFromExecution updates the adaptive scheduler with execution results
+func (w *AdaptiveSchedulerWrapper) UpdateFromExecution(record ExecutionRecord) {
+	result := adaptive.ExecutionResult{
+		Timestamp:    record.StartTime,
+		ResponseTime: record.Duration,
+		Success:      record.ExitCode == 0,
+		StatusCode:   record.ExitCode,
+		Error:        nil,
+	}
+
+	if record.ExitCode != 0 {
+		result.Error = fmt.Errorf("command failed with exit code %d", record.ExitCode)
+	}
+
+	w.scheduler.UpdateFromResult(result)
+}
+
+// GetMetrics returns current adaptive metrics
+func (w *AdaptiveSchedulerWrapper) GetMetrics() *adaptive.AdaptiveMetrics {
+	return w.scheduler.GetMetrics()
+}
+
+// showAdaptiveMetrics displays current adaptive scheduling metrics
+func (r *Runner) showAdaptiveMetrics(metrics *adaptive.AdaptiveMetrics) {
+	fmt.Printf("📊 Adaptive Metrics: Interval=%v, Success=%.1f%%, Circuit=%s\n",
+		metrics.CurrentInterval.Round(time.Millisecond),
+		metrics.SuccessRate*100,
+		r.circuitStateString(metrics.CircuitState))
+}
+
+// circuitStateString converts circuit state to readable string
+func (r *Runner) circuitStateString(state adaptive.CircuitState) string {
+	switch state {
+	case adaptive.CircuitClosed:
+		return "CLOSED"
+	case adaptive.CircuitOpen:
+		return "OPEN"
+	case adaptive.CircuitHalfOpen:
+		return "HALF-OPEN"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// createAdaptiveScheduler creates an adaptive scheduler
+func (r *Runner) createAdaptiveScheduler() (Scheduler, error) {
+	// Create adaptive configuration from CLI config
+	adaptiveConfig := &adaptive.AdaptiveConfig{
+		BaseInterval:           r.config.BaseInterval,
+		MinInterval:            r.config.MinInterval,
+		MaxInterval:            r.config.MaxInterval,
+		AdditiveIncrease:       200 * time.Millisecond, // Default
+		MultiplicativeDecrease: 0.6,                    // Default
+		ResponseTimeAlpha:      0.1,                    // Default
+		SlowThresholdFactor:    r.config.SlowThreshold,
+		FastThresholdFactor:    r.config.FastThreshold,
+		PriorAlpha:             1.0,  // Default
+		PriorBeta:              1.0,  // Default
+		DecayRate:              0.95, // Default
+		FailureThreshold:       r.config.FailureThreshold,
+		RecoveryThreshold:      0.8, // Default
+		WindowSize:             100, // Default
+		MinSamples:             10,  // Default
+	}
+
+	// Create adaptive scheduler
+	scheduler, err := adaptive.NewAdaptiveSchedulerWithValidation(adaptiveConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create adaptive scheduler: %w", err)
+	}
+
+	// Wrap it to implement Scheduler interface
+	return NewAdaptiveSchedulerWrapper(scheduler, r.config), nil
 }
