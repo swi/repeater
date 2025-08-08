@@ -73,6 +73,10 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 		if config.BaseInterval == 0 {
 			return nil, errors.New("adaptive requires --base-interval")
 		}
+	case "backoff":
+		if config.InitialInterval == 0 {
+			return nil, errors.New("backoff requires --initial")
+		}
 	default:
 		return nil, errors.New("unknown subcommand: " + config.Subcommand)
 	}
@@ -292,6 +296,8 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 		return r.createRateLimitScheduler()
 	case "adaptive":
 		return r.createAdaptiveScheduler()
+	case "backoff":
+		return r.createBackoffScheduler()
 	default:
 		return nil, fmt.Errorf("unknown subcommand: %s", r.config.Subcommand)
 	}
@@ -508,4 +514,14 @@ func (r *Runner) createAdaptiveScheduler() (Scheduler, error) {
 
 	// Wrap it to implement Scheduler interface
 	return NewAdaptiveSchedulerWrapper(scheduler, r.config), nil
+}
+
+// createBackoffScheduler creates an exponential backoff scheduler
+func (r *Runner) createBackoffScheduler() (Scheduler, error) {
+	return scheduler.NewExponentialBackoffScheduler(
+		r.config.InitialInterval,
+		r.config.BackoffMultiplier,
+		r.config.BackoffMax,
+		r.config.BackoffJitter,
+	), nil
 }
