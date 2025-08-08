@@ -523,8 +523,8 @@ func TestAdaptiveSubcommand(t *testing.T) {
 		},
 		{
 			name: "adaptive with all parameters",
-			args: []string{"adaptive", "--base-interval", "2s", "--min-interval", "500ms", 
-				"--max-interval", "1m", "--slow-threshold", "3.0", "--fast-threshold", "0.3", 
+			args: []string{"adaptive", "--base-interval", "2s", "--min-interval", "500ms",
+				"--max-interval", "1m", "--slow-threshold", "3.0", "--fast-threshold", "0.3",
 				"--failure-threshold", "0.2", "--show-metrics", "--", "curl", "api.com"},
 			expected: Config{
 				Subcommand:       "adaptive",
@@ -590,7 +590,7 @@ func TestAdaptiveSubcommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config, err := ParseArgs(tt.args)
-			
+
 			if tt.wantErr {
 				// For error cases, check both parsing and validation
 				if err == nil {
@@ -599,7 +599,7 @@ func TestAdaptiveSubcommand(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
-			
+
 			require.NoError(t, err)
 			require.NoError(t, ValidateConfig(config))
 			assert.Equal(t, tt.expected.Subcommand, config.Subcommand)
