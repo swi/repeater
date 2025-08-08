@@ -77,6 +77,10 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 		if config.InitialInterval == 0 {
 			return nil, errors.New("backoff requires --initial")
 		}
+	case "load-adaptive":
+		if config.BaseInterval == 0 {
+			return nil, errors.New("load-adaptive requires --base-interval")
+		}
 	default:
 		return nil, errors.New("unknown subcommand: " + config.Subcommand)
 	}
@@ -298,6 +302,8 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 		return r.createAdaptiveScheduler()
 	case "backoff":
 		return r.createBackoffScheduler()
+	case "load-adaptive":
+		return r.createLoadAdaptiveScheduler()
 	default:
 		return nil, fmt.Errorf("unknown subcommand: %s", r.config.Subcommand)
 	}
@@ -523,5 +529,17 @@ func (r *Runner) createBackoffScheduler() (Scheduler, error) {
 		r.config.BackoffMultiplier,
 		r.config.BackoffMax,
 		r.config.BackoffJitter,
+	), nil
+}
+
+// createLoadAdaptiveScheduler creates a load-aware adaptive scheduler
+func (r *Runner) createLoadAdaptiveScheduler() (Scheduler, error) {
+	return scheduler.NewLoadAwareSchedulerWithBounds(
+		r.config.BaseInterval,
+		r.config.TargetCPU,
+		r.config.TargetMemory,
+		r.config.TargetLoad,
+		r.config.MinInterval,
+		r.config.MaxInterval,
 	), nil
 }

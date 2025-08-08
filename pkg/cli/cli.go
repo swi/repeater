@@ -38,6 +38,11 @@ type Config struct {
 	BackoffMax        time.Duration // maximum backoff interval
 	BackoffMultiplier float64       // backoff multiplier
 	BackoffJitter     float64       // jitter factor (0.0-1.0)
+
+	// Load-aware adaptive fields
+	TargetCPU    float64 // target CPU usage percentage (0-100)
+	TargetMemory float64 // target memory usage percentage (0-100)
+	TargetLoad   float64 // target load average
 }
 
 // ParseArgs parses command line arguments and returns a Config
@@ -157,6 +162,9 @@ func normalizeSubcommand(cmd string) string {
 	// Backoff variations
 	case "backoff", "back", "b":
 		return "backoff"
+	// Load-adaptive variations
+	case "load-adaptive", "load", "la":
+		return "load-adaptive"
 	default:
 		return ""
 	}
@@ -237,6 +245,18 @@ func (p *argParser) parseSubcommandFlags() error {
 			}
 		case "--jitter":
 			if err := p.parseFloatFlag(&p.config.BackoffJitter); err != nil {
+				return err
+			}
+		case "--target-cpu":
+			if err := p.parseFloatFlag(&p.config.TargetCPU); err != nil {
+				return err
+			}
+		case "--target-memory":
+			if err := p.parseFloatFlag(&p.config.TargetMemory); err != nil {
+				return err
+			}
+		case "--target-load":
+			if err := p.parseFloatFlag(&p.config.TargetLoad); err != nil {
 				return err
 			}
 		default:
@@ -367,6 +387,14 @@ func ValidateConfig(config *Config) error {
 		if err := validateBackoffConfig(config); err != nil {
 			return fmt.Errorf("invalid backoff config: %w", err)
 		}
+	case "load-adaptive":
+		if config.BaseInterval == 0 {
+			return errors.New("--base-interval is required for load-adaptive subcommand")
+		}
+		// Validate load-adaptive configuration
+		if err := validateLoadAdaptiveConfig(config); err != nil {
+			return fmt.Errorf("invalid load-adaptive config: %w", err)
+		}
 	}
 
 	return nil
@@ -470,6 +498,45 @@ func validateBackoffConfig(config *Config) error {
 
 	if config.BackoffJitter < 0 || config.BackoffJitter > 1.0 {
 		return errors.New("jitter must be between 0.0 and 1.0")
+	}
+
+	return nil
+}
+
+// validateLoadAdaptiveConfig validates the load-adaptive configuration
+func validateLoadAdaptiveConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.TargetCPU == 0 {
+		config.TargetCPU = 70.0 // Default 70% CPU target
+	}
+	if config.TargetMemory == 0 {
+		config.TargetMemory = 80.0 // Default 80% memory target
+	}
+	if config.TargetLoad == 0 {
+		config.TargetLoad = 1.0 // Default load average of 1.0
+	}
+	if config.MinInterval == 0 {
+		config.MinInterval = config.BaseInterval / 10
+	}
+	if config.MaxInterval == 0 {
+		config.MaxInterval = config.BaseInterval * 10
+	}
+
+	// Validate bounds
+	if config.TargetCPU <= 0 || config.TargetCPU > 100 {
+		return errors.New("target-cpu must be between 0 and 100")
+	}
+
+	if config.TargetMemory <= 0 || config.TargetMemory > 100 {
+		return errors.New("target-memory must be between 0 and 100")
+	}
+
+	if config.TargetLoad <= 0 {
+		return errors.New("target-load must be greater than 0")
+	}
+
+	if config.MinInterval >= config.MaxInterval {
+		return errors.New("min-interval must be less than max-interval")
 	}
 
 	return nil
