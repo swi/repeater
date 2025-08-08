@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,6 +18,11 @@ type Config struct {
 	Help       bool
 	Version    bool
 	ConfigFile string
+
+	// Rate limiting fields
+	RateSpec     string // e.g., "10/1h", "100/1m"
+	RetryPattern string // e.g., "0,10m,30m"
+	ShowNext     bool   // show next allowed time
 }
 
 // ParseArgs parses command line arguments and returns a Config
@@ -127,6 +133,9 @@ func normalizeSubcommand(cmd string) string {
 	// Duration variations
 	case "duration", "dur", "d":
 		return "duration"
+	// Rate limit variations
+	case "rate-limit", "rate", "rl", "r":
+		return "rate-limit"
 	default:
 		return ""
 	}
@@ -155,6 +164,17 @@ func (p *argParser) parseSubcommandFlags() error {
 			if err := p.parseDurationFlag(&p.config.For); err != nil {
 				return err
 			}
+		case "--rate", "-r":
+			if err := p.parseStringFlag(&p.config.RateSpec); err != nil {
+				return err
+			}
+		case "--retry-pattern", "-p":
+			if err := p.parseStringFlag(&p.config.RetryPattern); err != nil {
+				return err
+			}
+		case "--show-next", "-n":
+			p.config.ShowNext = true
+			p.pos++
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -190,6 +210,17 @@ func (p *argParser) parseTimesFlag() error {
 	}
 
 	p.config.Times = times
+	p.pos += 2
+	return nil
+}
+
+// parseStringFlag parses a string flag value
+func (p *argParser) parseStringFlag(target *string) error {
+	if p.pos+1 >= len(p.args) {
+		return fmt.Errorf("%s requires a value", p.args[p.pos])
+	}
+
+	*target = p.args[p.pos+1]
 	p.pos += 2
 	return nil
 }
@@ -232,6 +263,45 @@ func ValidateConfig(config *Config) error {
 		if config.For == 0 {
 			return errors.New("--for is required for duration subcommand")
 		}
+	case "rate-limit":
+		if config.RateSpec == "" {
+			return errors.New("--rate is required for rate-limit subcommand")
+		}
+		// Validate rate spec format
+		if err := validateRateSpec(config.RateSpec); err != nil {
+			return fmt.Errorf("invalid rate spec: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// validateRateSpec validates the rate specification format
+func validateRateSpec(spec string) error {
+	// Use the ParseRateSpec function from ratelimit package to validate
+	// For now, do basic validation here to avoid circular imports
+	if spec == "" {
+		return errors.New("rate spec cannot be empty")
+	}
+
+	// Basic format check: should contain "/"
+	if !strings.Contains(spec, "/") {
+		return errors.New("rate spec must be in format 'rate/period' (e.g., '10/1h')")
+	}
+
+	parts := strings.Split(spec, "/")
+	if len(parts) != 2 {
+		return errors.New("rate spec must be in format 'rate/period' (e.g., '10/1h')")
+	}
+
+	// Validate rate part is a number
+	if _, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 64); err != nil {
+		return fmt.Errorf("invalid rate number: %s", parts[0])
+	}
+
+	// Validate period part is a valid duration
+	if _, err := time.ParseDuration(strings.TrimSpace(parts[1])); err != nil {
+		return fmt.Errorf("invalid period duration: %s", parts[1])
 	}
 
 	return nil

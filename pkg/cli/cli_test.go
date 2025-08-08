@@ -8,6 +8,104 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestRateLimitSubcommand tests the new rate-limit subcommand parsing
+func TestRateLimitSubcommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected Config
+		wantErr  bool
+	}{
+		{
+			name: "rate-limit with basic rate spec",
+			args: []string{"rate-limit", "--rate", "10/1h", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand: "rate-limit",
+				RateSpec:   "10/1h",
+				Command:    []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "rate-limit with retry pattern",
+			args: []string{"rate-limit", "--rate", "100/1h", "--retry-pattern", "0,10m,30m", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:   "rate-limit",
+				RateSpec:     "100/1h",
+				RetryPattern: "0,10m,30m",
+				Command:      []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "rate-limit with show-next flag",
+			args: []string{"rate-limit", "--rate", "5/1m", "--show-next", "--", "echo", "test"},
+			expected: Config{
+				Subcommand: "rate-limit",
+				RateSpec:   "5/1m",
+				ShowNext:   true,
+				Command:    []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "rate-limit abbreviations",
+			args: []string{"rl", "--rate", "50/1h", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand: "rate-limit",
+				RateSpec:   "50/1h",
+				Command:    []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "rate-limit short flags",
+			args: []string{"rate-limit", "-r", "20/1m", "-p", "0,5m", "-n", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:   "rate-limit",
+				RateSpec:     "20/1m",
+				RetryPattern: "0,5m",
+				ShowNext:     true,
+				Command:      []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "rate-limit missing rate spec",
+			args:    []string{"rate-limit", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+		{
+			name:    "rate-limit invalid rate spec",
+			args:    []string{"rate-limit", "--rate", "invalid", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := ParseArgs(tt.args)
+
+			if tt.wantErr {
+				// For error cases, check both parsing and validation
+				if err == nil {
+					err = ValidateConfig(config)
+				}
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NoError(t, ValidateConfig(config))
+			assert.Equal(t, tt.expected.Subcommand, config.Subcommand)
+			assert.Equal(t, tt.expected.RateSpec, config.RateSpec)
+			assert.Equal(t, tt.expected.RetryPattern, config.RetryPattern)
+			assert.Equal(t, tt.expected.ShowNext, config.ShowNext)
+			assert.Equal(t, tt.expected.Command, config.Command)
+		})
+	}
+}
+
 func TestCLIParsing(t *testing.T) {
 	tests := []struct {
 		name     string
