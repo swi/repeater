@@ -63,6 +63,7 @@ func showHelp() {
 	fmt.Println("  rate-limit, rate, rl   Execute command with server-friendly rate limiting")
 	fmt.Println("  adaptive, adapt, a     Execute command with adaptive scheduling")
 	fmt.Println("  backoff, back, b       Execute command with exponential backoff")
+	fmt.Println("  load-adaptive, load, la Execute command with load-aware adaptive scheduling")
 	fmt.Println()
 	fmt.Println("COMMON OPTIONS:")
 	fmt.Println("  --every, -e DURATION       Interval between executions")
@@ -77,6 +78,9 @@ func showHelp() {
 	fmt.Println("  --max, -x DUR              Maximum backoff interval")
 	fmt.Println("  --multiplier FLOAT         Backoff multiplier (default: 2.0)")
 	fmt.Println("  --jitter FLOAT             Jitter factor 0.0-1.0 (default: 0.0)")
+	fmt.Println("  --target-cpu FLOAT         Target CPU usage % for load-adaptive (default: 70)")
+	fmt.Println("  --target-memory FLOAT      Target memory usage % for load-adaptive (default: 80)")
+	fmt.Println("  --target-load FLOAT        Target load average for load-adaptive (default: 1.0)")
 	fmt.Println()
 	fmt.Println("EXAMPLES:")
 	fmt.Println("  rpr interval --every 30s --times 10 -- curl http://example.com")
@@ -92,6 +96,8 @@ func showHelp() {
 	fmt.Println("  rpr a -b 500ms --times 10 -- echo 'adaptive test'")
 	fmt.Println("  rpr backoff --initial 100ms --max 30s --multiplier 2.0 -- curl api.com")
 	fmt.Println("  rpr b -i 200ms -x 10s --jitter 0.1 -- echo 'backoff test'")
+	fmt.Println("  rpr load-adaptive --base-interval 1s --target-cpu 60 -- curl api.com")
+	fmt.Println("  rpr la --base-interval 500ms --target-memory 70 -- echo 'load test'")
 	fmt.Println()
 	fmt.Println("For more information, see: https://github.com/swi/repeater")
 }
@@ -173,6 +179,17 @@ func showExecutionInfo(config *cli.Config) {
 		}
 		if config.BackoffJitter > 0 {
 			fmt.Printf(", jitter %.1f%%", config.BackoffJitter*100)
+		}
+	case "load-adaptive":
+		fmt.Printf("⚖️  Load-adaptive execution: base interval %v", config.BaseInterval)
+		if config.TargetCPU > 0 {
+			fmt.Printf(", target CPU %.0f%%", config.TargetCPU)
+		}
+		if config.TargetMemory > 0 {
+			fmt.Printf(", memory %.0f%%", config.TargetMemory)
+		}
+		if config.TargetLoad > 0 {
+			fmt.Printf(", load %.1f", config.TargetLoad)
 		}
 	}
 	fmt.Printf("\n📋 Command: %v\n", config.Command)
