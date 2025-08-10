@@ -135,7 +135,7 @@ func TestLoadAwareScheduler(t *testing.T) {
 			scheduler.SetMockMetrics(tt.mockMetrics)
 
 			// Update scheduler with mock metrics
-			scheduler.UpdateFromMetrics()
+			_ = scheduler.UpdateFromMetrics()
 
 			// Get current interval
 			interval := scheduler.GetCurrentInterval()
@@ -175,7 +175,7 @@ func TestLoadAwareSchedulerConcurrency(t *testing.T) {
 				Timestamp:     time.Now(),
 			}
 			scheduler.SetMockMetrics(mockMetrics)
-			scheduler.UpdateFromMetrics()
+			_ = scheduler.UpdateFromMetrics()
 			time.Sleep(1 * time.Millisecond)
 		}
 		done <- true
@@ -214,7 +214,7 @@ func TestLoadAwareSchedulerBounds(t *testing.T) {
 		Timestamp:     time.Now(),
 	}
 	scheduler.SetMockMetrics(lowLoadMetrics)
-	scheduler.UpdateFromMetrics()
+	_ = scheduler.UpdateFromMetrics()
 
 	interval := scheduler.GetCurrentInterval()
 	assert.GreaterOrEqual(t, interval, minInterval)
@@ -227,7 +227,7 @@ func TestLoadAwareSchedulerBounds(t *testing.T) {
 		Timestamp:     time.Now(),
 	}
 	scheduler.SetMockMetrics(highLoadMetrics)
-	scheduler.UpdateFromMetrics()
+	_ = scheduler.UpdateFromMetrics()
 
 	interval = scheduler.GetCurrentInterval()
 	assert.LessOrEqual(t, interval, maxInterval)
@@ -249,7 +249,7 @@ func TestLoadAwareSchedulerMetricsHistory(t *testing.T) {
 			Timestamp:     time.Now().Add(time.Duration(i) * time.Second),
 		}
 		scheduler.SetMockMetrics(metrics)
-		scheduler.UpdateFromMetrics()
+		_ = scheduler.UpdateFromMetrics()
 	}
 
 	// Get metrics history

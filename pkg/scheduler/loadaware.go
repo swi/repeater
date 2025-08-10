@@ -268,7 +268,7 @@ func (s *LoadAwareScheduler) scheduleLoop() {
 			return
 		case <-ticker.C:
 			// Update metrics and adjust interval
-			s.UpdateFromMetrics()
+			_ = s.UpdateFromMetrics()
 		default:
 			// Get current interval and wait
 			interval := s.GetCurrentInterval()

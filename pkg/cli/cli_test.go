@@ -669,8 +669,8 @@ func TestBackoffSubcommand(t *testing.T) {
 				Subcommand:        "backoff",
 				InitialInterval:   time.Second,
 				BackoffMax:        30 * time.Second, // default
-				BackoffMultiplier: 2.0,             // default
-				BackoffJitter:     0.0,             // default
+				BackoffMultiplier: 2.0,              // default
+				BackoffJitter:     0.0,              // default
 				Command:           []string{"curl", "api.com"},
 			},
 			wantErr: false,

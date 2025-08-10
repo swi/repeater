@@ -856,4 +856,697 @@ rpr interval --every 10m --continue-on-error -- bash -c '
 '
 ```
 
+## Load-Based Adaptive Scheduling Examples
+
+### Overview
+
+Load-based adaptive scheduling automatically adjusts execution intervals based on real-time system resource usage (CPU, memory, and load average). This feature is ideal for scenarios where system load varies significantly and you want to maintain optimal performance while avoiding system overload.
+
+### 1. API Server Load Management
+
+#### Adaptive API Health Monitoring
+```bash
+# Monitor API health with automatic load adjustment
+rpr load-adaptive --base-interval 30s --target-cpu 70 --target-memory 80 --target-load 1.0 --for 24h -- bash -c '
+    echo "=== API Health Check $(date) ==="
+    
+    # Comprehensive health check
+    start_time=$(date +%s.%N)
+    
+    # Check main API endpoint
+    api_response=$(curl -w "%{http_code},%{time_total}" -o /dev/null -s \
+        --max-time 10 http://api.example.com/health)
+    
+    # Check database connectivity
+    db_response=$(curl -w "%{http_code},%{time_total}" -o /dev/null -s \
+        --max-time 5 http://api.example.com/db-health)
+    
+    # Check cache connectivity
+    cache_response=$(curl -w "%{http_code},%{time_total}" -o /dev/null -s \
+        --max-time 3 http://api.example.com/cache-health)
+    
+    end_time=$(date +%s.%N)
+    total_time=$(echo "$end_time - $start_time" | bc)
+    
+    echo "API: $api_response, DB: $db_response, Cache: $cache_response"
+    echo "Total check time: ${total_time}s"
+    
+    # Exit with error if any service is down
+    if [[ $api_response != 200* ]] || [[ $db_response != 200* ]] || [[ $cache_response != 200* ]]; then
+        echo "❌ One or more services unhealthy"
+        exit 1
+    fi
+    
+    echo "✅ All services healthy"
+'
+```
+
+**Use Case**: During high traffic periods (Black Friday, product launches), the system automatically reduces monitoring frequency to avoid adding load. During low traffic, it increases frequency for better responsiveness.
+
+#### Load-Aware Performance Testing
+```bash
+# Performance testing that adapts to system load
+rpr load-adaptive --base-interval 1s --target-cpu 60 --target-memory 75 --target-load 0.8 --for 2h -- bash -c '
+    echo "=== Load Test Iteration $(date) ==="
+    
+    # Generate controlled load based on current system capacity
+    current_cpu=$(top -l 1 | grep "CPU usage" | awk "{print \$3}" | sed "s/%//")
+    current_memory=$(vm_stat | grep "Pages active" | awk "{print \$3}" | sed "s/\.//" )
+    
+    echo "Current system state: CPU=${current_cpu}%, Memory pressure indicator=${current_memory}"
+    
+    # Adjust test intensity based on current load
+    if (( $(echo "$current_cpu < 30" | bc -l) )); then
+        # Low load - increase test intensity
+        concurrent_requests=20
+        request_timeout=5
+    elif (( $(echo "$current_cpu < 60" | bc -l) )); then
+        # Medium load - moderate intensity
+        concurrent_requests=10
+        request_timeout=10
+    else
+        # High load - reduce intensity
+        concurrent_requests=5
+        request_timeout=15
+    fi
+    
+    echo "Test parameters: concurrent_requests=$concurrent_requests, timeout=${request_timeout}s"
+    
+    # Execute load test
+    for i in $(seq 1 $concurrent_requests); do
+        (
+            response=$(curl -w "%{http_code},%{time_total},%{size_download}" \
+                --max-time $request_timeout -o /dev/null -s \
+                "http://api.example.com/load-test?iteration=$i")
+            echo "Request $i: $response"
+        ) &
+    done
+    
+    wait
+    echo "Load test iteration completed"
+'
+```
+
+**Use Case**: Continuous performance testing that automatically scales back during peak hours to avoid impacting production traffic, and scales up during off-hours for comprehensive testing.
+
+### 2. Database Operations and Maintenance
+
+#### Adaptive Database Maintenance
+```bash
+# Database maintenance that adapts to system load
+rpr load-adaptive --base-interval 15m --target-cpu 50 --target-memory 70 --target-load 1.2 --for 12h -- bash -c '
+    echo "=== Database Maintenance $(date) ==="
+    
+    # Check current database load
+    active_connections=$(psql -h db.example.com -U monitor -d production -t -c "
+        SELECT count(*) FROM pg_stat_activity WHERE state = '\''active'\'';
+    ")
+    
+    slow_queries=$(psql -h db.example.com -U monitor -d production -t -c "
+        SELECT count(*) FROM pg_stat_activity 
+        WHERE state = '\''active'\'' AND now() - query_start > interval '\''30 seconds'\'';
+    ")
+    
+    echo "Database state: $active_connections active connections, $slow_queries slow queries"
+    
+    # Adjust maintenance operations based on database load
+    if [ "$active_connections" -lt 10 ] && [ "$slow_queries" -eq 0 ]; then
+        echo "Low database load - performing comprehensive maintenance"
+        
+        # Vacuum analyze on large tables
+        psql -h db.example.com -U maintenance -d production -c "
+            VACUUM ANALYZE user_sessions;
+            VACUUM ANALYZE application_logs;
+            VACUUM ANALYZE audit_trail;
+        "
+        
+        # Update statistics
+        psql -h db.example.com -U maintenance -d production -c "
+            ANALYZE;
+        "
+        
+        # Reindex if needed
+        psql -h db.example.com -U maintenance -d production -c "
+            REINDEX INDEX CONCURRENTLY idx_user_sessions_created_at;
+        "
+        
+    elif [ "$active_connections" -lt 25 ]; then
+        echo "Medium database load - performing light maintenance"
+        
+        # Only vacuum small tables
+        psql -h db.example.com -U maintenance -d production -c "
+            VACUUM user_preferences;
+            VACUUM system_settings;
+        "
+        
+    else
+        echo "High database load - skipping maintenance"
+        exit 0
+    fi
+    
+    echo "Database maintenance completed"
+'
+```
+
+**Use Case**: Database maintenance that automatically scales operations based on current database load. During peak business hours, it performs minimal maintenance. During off-hours, it performs comprehensive maintenance operations.
+
+#### Load-Aware Data Processing Pipeline
+```bash
+# ETL pipeline that adapts processing intensity to system resources
+rpr load-adaptive --base-interval 5m --target-cpu 65 --target-memory 80 --target-load 1.5 --for 8h -- bash -c '
+    echo "=== ETL Pipeline $(date) ==="
+    
+    # Check available system resources
+    available_memory=$(free | grep "Mem:" | awk "{print (\$7/\$2)*100}")
+    cpu_idle=$(top -bn1 | grep "Cpu(s)" | awk "{print \$8}" | sed "s/%id,//")
+    
+    echo "System resources: ${available_memory}% memory available, ${cpu_idle}% CPU idle"
+    
+    # Determine batch size based on available resources
+    if (( $(echo "$available_memory > 50 && $cpu_idle > 50" | bc -l) )); then
+        batch_size=10000
+        parallel_workers=8
+        echo "High resources available - large batch processing"
+    elif (( $(echo "$available_memory > 25 && $cpu_idle > 25" | bc -l) )); then
+        batch_size=5000
+        parallel_workers=4
+        echo "Medium resources available - moderate batch processing"
+    else
+        batch_size=1000
+        parallel_workers=2
+        echo "Limited resources available - small batch processing"
+    fi
+    
+    # Process data with adaptive batch size
+    python3 -c "
+import multiprocessing as mp
+import psutil
+import time
+import sys
+
+def process_batch(batch_id):
+    print(f\"Processing batch {batch_id} with size $batch_size\")
+    
+    # Simulate data processing
+    time.sleep(2)  # Simulated processing time
+    
+    # Monitor resource usage during processing
+    cpu_percent = psutil.cpu_percent(interval=1)
+    memory_percent = psutil.virtual_memory().percent
+    
+    if cpu_percent > 85 or memory_percent > 90:
+        print(f\"Resource threshold exceeded: CPU={cpu_percent}%, Memory={memory_percent}%\")
+        return False
+    
+    return True
+
+# Process batches in parallel
+with mp.Pool($parallel_workers) as pool:
+    results = pool.map(process_batch, range(1, 6))  # Process 5 batches
+    
+    if all(results):
+        print(\"All batches processed successfully\")
+    else:
+        print(\"Some batches failed due to resource constraints\")
+        sys.exit(1)
+"
+    
+    echo "ETL pipeline iteration completed"
+'
+```
+
+**Use Case**: Data processing pipeline that automatically adjusts batch sizes and parallelism based on available system resources, ensuring optimal throughput without overwhelming the system.
+
+### 3. Monitoring and Alerting Systems
+
+#### Adaptive System Monitoring
+```bash
+# System monitoring with load-aware frequency adjustment
+rpr load-adaptive --base-interval 2m --target-cpu 75 --target-memory 85 --target-load 2.0 --for 24h -- bash -c '
+    echo "=== System Monitor $(date) ==="
+    
+    # Collect comprehensive system metrics
+    cpu_usage=$(top -l 1 | grep "CPU usage" | awk "{print \$3}" | sed "s/%//")
+    memory_usage=$(vm_stat | grep "Pages active" | awk "{print \$3}" | sed "s/\.//" )
+    disk_usage=$(df / | tail -1 | awk "{print \$5}" | sed "s/%//")
+    load_avg=$(uptime | awk -F"load averages:" "{print \$2}" | awk "{print \$1}")
+    
+    # Network connections
+    tcp_connections=$(netstat -an | grep ESTABLISHED | wc -l)
+    
+    # Process count
+    process_count=$(ps aux | wc -l)
+    
+    echo "System Metrics:"
+    echo "  CPU Usage: ${cpu_usage}%"
+    echo "  Memory Pressure: ${memory_usage}"
+    echo "  Disk Usage: ${disk_usage}%"
+    echo "  Load Average: ${load_avg}"
+    echo "  TCP Connections: ${tcp_connections}"
+    echo "  Process Count: ${process_count}"
+    
+    # Adaptive alerting based on system state
+    alert_threshold_cpu=80
+    alert_threshold_disk=90
+    
+    # Lower thresholds when system is already under stress
+    if (( $(echo "$load_avg > 3.0" | bc -l) )); then
+        alert_threshold_cpu=70
+        alert_threshold_disk=85
+        echo "System under stress - lowering alert thresholds"
+    fi
+    
+    # Generate alerts
+    alerts=()
+    
+    if (( $(echo "$cpu_usage > $alert_threshold_cpu" | bc -l) )); then
+        alerts+=("High CPU usage: ${cpu_usage}%")
+    fi
+    
+    if [ "$disk_usage" -gt "$alert_threshold_disk" ]; then
+        alerts+=("High disk usage: ${disk_usage}%")
+    fi
+    
+    if [ "$tcp_connections" -gt 1000 ]; then
+        alerts+=("High connection count: ${tcp_connections}")
+    fi
+    
+    # Send alerts if any
+    if [ ${#alerts[@]} -gt 0 ]; then
+        echo "🚨 ALERTS:"
+        for alert in "${alerts[@]}"; do
+            echo "  - $alert"
+            # Send to monitoring system
+            curl -X POST https://monitoring.example.com/alerts \
+                 -H "Content-Type: application/json" \
+                 -d "{\"message\": \"$alert\", \"timestamp\": \"$(date -Iseconds)\"}"
+        done
+    else
+        echo "✅ All systems normal"
+    fi
+    
+    # Log metrics to time series database
+    curl -X POST https://metrics.example.com/api/v1/metrics \
+         -H "Content-Type: application/json" \
+         -d "{
+             \"timestamp\": \"$(date -Iseconds)\",
+             \"metrics\": {
+                 \"cpu_usage\": $cpu_usage,
+                 \"disk_usage\": $disk_usage,
+                 \"load_average\": $load_avg,
+                 \"tcp_connections\": $tcp_connections,
+                 \"process_count\": $process_count
+             }
+         }"
+'
+```
+
+**Use Case**: System monitoring that automatically reduces monitoring frequency during high load periods to avoid adding overhead, while increasing frequency during normal periods for better observability.
+
+#### Load-Aware Log Analysis
+```bash
+# Log analysis that adapts processing intensity to system load
+rpr load-adaptive --base-interval 10m --target-cpu 60 --target-memory 75 --for 12h -- bash -c '
+    echo "=== Log Analysis $(date) ==="
+    
+    # Check log file sizes and system resources
+    log_size=$(du -sm /var/log/application/*.log | awk "{sum += \$1} END {print sum}")
+    available_memory_gb=$(free -g | grep "Mem:" | awk "{print \$7}")
+    
+    echo "Log files size: ${log_size}MB, Available memory: ${available_memory_gb}GB"
+    
+    # Adaptive processing strategy
+    if [ "$available_memory_gb" -gt 4 ] && [ "$log_size" -lt 1000 ]; then
+        # High memory, small logs - comprehensive analysis
+        echo "Performing comprehensive log analysis"
+        
+        # Full text search for errors
+        grep -r "ERROR\|FATAL\|CRITICAL" /var/log/application/ | \
+            awk "{print \$1, \$2, \$3}" | sort | uniq -c | sort -nr > /tmp/error_summary.txt
+        
+        # Performance analysis
+        grep -r "slow query\|timeout\|performance" /var/log/application/ | \
+            wc -l > /tmp/performance_issues.txt
+        
+        # Security analysis
+        grep -r "authentication failed\|unauthorized\|security" /var/log/application/ | \
+            wc -l > /tmp/security_events.txt
+        
+        # Generate detailed report
+        python3 -c "
+import json
+import datetime
+
+# Read analysis results
+with open('/tmp/error_summary.txt', 'r') as f:
+    error_count = len(f.readlines())
+
+with open('/tmp/performance_issues.txt', 'r') as f:
+    perf_issues = int(f.read().strip())
+
+with open('/tmp/security_events.txt', 'r') as f:
+    security_events = int(f.read().strip())
+
+# Generate report
+report = {
+    'timestamp': datetime.datetime.now().isoformat(),
+    'analysis_type': 'comprehensive',
+    'error_types': error_count,
+    'performance_issues': perf_issues,
+    'security_events': security_events,
+    'log_size_mb': $log_size
+}
+
+print(json.dumps(report, indent=2))
+
+# Send to monitoring system
+import requests
+requests.post('https://monitoring.example.com/log-analysis', json=report)
+"
+        
+    elif [ "$available_memory_gb" -gt 2 ]; then
+        # Medium memory - focused analysis
+        echo "Performing focused log analysis"
+        
+        # Only check for critical errors
+        critical_errors=$(grep -r "FATAL\|CRITICAL" /var/log/application/ | wc -l)
+        recent_errors=$(grep -r "ERROR" /var/log/application/ | grep "$(date +%Y-%m-%d)" | wc -l)
+        
+        echo "Critical errors: $critical_errors, Recent errors: $recent_errors"
+        
+        if [ "$critical_errors" -gt 0 ] || [ "$recent_errors" -gt 100 ]; then
+            echo "🚨 High error rate detected"
+            # Send alert
+            curl -X POST https://monitoring.example.com/alerts \
+                 -d "{\"message\": \"High error rate: $critical_errors critical, $recent_errors recent\"}"
+        fi
+        
+    else
+        # Low memory - minimal analysis
+        echo "Performing minimal log analysis"
+        
+        # Only check for critical system errors
+        critical_count=$(grep -c "FATAL\|CRITICAL" /var/log/application/app.log 2>/dev/null || echo 0)
+        
+        if [ "$critical_count" -gt 0 ]; then
+            echo "🚨 Critical errors found: $critical_count"
+            # Send immediate alert
+            curl -X POST https://monitoring.example.com/alerts \
+                 -d "{\"message\": \"Critical errors detected: $critical_count\"}"
+        fi
+    fi
+    
+    echo "Log analysis completed"
+'
+```
+
+**Use Case**: Log analysis system that adapts its processing depth based on available system resources. During high load, it performs minimal critical error checking. During low load, it performs comprehensive analysis including security and performance metrics.
+
+### 4. Development and CI/CD Workflows
+
+#### Adaptive Test Execution
+```bash
+# Test suite execution that adapts to system resources
+rpr load-adaptive --base-interval 30m --target-cpu 70 --target-memory 80 --for 8h -- bash -c '
+    echo "=== Adaptive Test Execution $(date) ==="
+    
+    # Check system resources and current load
+    cpu_cores=$(nproc)
+    available_memory_gb=$(free -g | grep "Mem:" | awk "{print \$7}")
+    current_load=$(uptime | awk -F"load averages:" "{print \$2}" | awk "{print \$1}")
+    
+    echo "System: ${cpu_cores} cores, ${available_memory_gb}GB available memory, load: ${current_load}"
+    
+    # Determine test execution strategy
+    if (( $(echo "$available_memory_gb > 8 && $current_load < 2.0" | bc -l) )); then
+        # High resources - run full test suite with parallelization
+        test_strategy="comprehensive"
+        parallel_jobs=$((cpu_cores - 1))
+        test_timeout="30m"
+        
+        echo "Running comprehensive test suite with $parallel_jobs parallel jobs"
+        
+        # Run all test categories
+        npm run test:unit -- --parallel=$parallel_jobs --timeout=$test_timeout
+        npm run test:integration -- --parallel=$((parallel_jobs / 2)) --timeout=$test_timeout
+        npm run test:e2e -- --timeout=$test_timeout
+        
+        # Run performance tests
+        npm run test:performance
+        
+        # Run security tests
+        npm run test:security
+        
+    elif (( $(echo "$available_memory_gb > 4 && $current_load < 4.0" | bc -l) )); then
+        # Medium resources - run core tests
+        test_strategy="core"
+        parallel_jobs=$((cpu_cores / 2))
+        test_timeout="20m"
+        
+        echo "Running core test suite with $parallel_jobs parallel jobs"
+        
+        # Run essential tests only
+        npm run test:unit -- --parallel=$parallel_jobs --timeout=$test_timeout
+        npm run test:integration -- --timeout=$test_timeout
+        
+        # Skip performance and e2e tests
+        echo "Skipping performance and e2e tests due to resource constraints"
+        
+    else
+        # Low resources - run minimal critical tests
+        test_strategy="minimal"
+        parallel_jobs=1
+        test_timeout="10m"
+        
+        echo "Running minimal test suite (single-threaded)"
+        
+        # Run only critical unit tests
+        npm run test:unit -- --grep="critical" --timeout=$test_timeout
+        
+        echo "Skipping non-critical tests due to high system load"
+    fi
+    
+    # Collect and report test results
+    test_exit_code=$?
+    
+    # Generate test report
+    python3 -c "
+import json
+import datetime
+import subprocess
+
+# Get test results
+try:
+    result = subprocess.run(['npm', 'run', 'test:report'], 
+                          capture_output=True, text=True, timeout=60)
+    test_results = json.loads(result.stdout) if result.stdout else {}
+except:
+    test_results = {'error': 'Failed to generate test report'}
+
+# Create comprehensive report
+report = {
+    'timestamp': datetime.datetime.now().isoformat(),
+    'strategy': '$test_strategy',
+    'parallel_jobs': $parallel_jobs,
+    'system_resources': {
+        'cpu_cores': $cpu_cores,
+        'available_memory_gb': $available_memory_gb,
+        'current_load': float('$current_load')
+    },
+    'test_results': test_results,
+    'exit_code': $test_exit_code
+}
+
+print(json.dumps(report, indent=2))
+
+# Send to CI/CD system
+import requests
+try:
+    requests.post('https://ci.example.com/test-reports', json=report, timeout=30)
+    print('Test report sent to CI/CD system')
+except:
+    print('Failed to send test report')
+"
+    
+    if [ $test_exit_code -eq 0 ]; then
+        echo "✅ Tests passed with $test_strategy strategy"
+    else
+        echo "❌ Tests failed with $test_strategy strategy"
+        exit 1
+    fi
+'
+```
+
+**Use Case**: CI/CD pipeline that adapts test execution based on available build server resources. During peak development hours with high server load, it runs minimal critical tests. During off-hours, it runs comprehensive test suites including performance and security tests.
+
+#### Load-Aware Build Optimization
+```bash
+# Build system that adapts compilation settings to system resources
+rpr load-adaptive --base-interval 15m --target-cpu 80 --target-memory 85 --for 4h -- bash -c '
+    echo "=== Adaptive Build System $(date) ==="
+    
+    # Check for code changes
+    if ! git diff --quiet HEAD~1; then
+        echo "Code changes detected, starting adaptive build"
+    else
+        echo "No changes detected, skipping build"
+        exit 0
+    fi
+    
+    # Assess system resources
+    cpu_cores=$(nproc)
+    available_memory_gb=$(free -g | grep "Mem:" | awk "{print \$7}")
+    disk_io_wait=$(iostat -c 1 2 | tail -1 | awk "{print \$4}")
+    
+    echo "Build environment: ${cpu_cores} cores, ${available_memory_gb}GB memory, ${disk_io_wait}% I/O wait"
+    
+    # Determine build configuration
+    if (( $(echo "$available_memory_gb > 16 && $disk_io_wait < 10" | bc -l) )); then
+        # High-performance build
+        build_type="optimized"
+        make_jobs=$((cpu_cores * 2))
+        optimization_level="-O3"
+        enable_lto="true"
+        
+        echo "High-performance build: $make_jobs parallel jobs, full optimization"
+        
+        # Configure build
+        export MAKEFLAGS="-j$make_jobs"
+        export CFLAGS="$optimization_level -flto"
+        export CXXFLAGS="$optimization_level -flto"
+        
+        # Full build with all optimizations
+        make clean
+        make all
+        make test
+        
+        # Generate optimized packages
+        make package-optimized
+        
+    elif (( $(echo "$available_memory_gb > 8 && $disk_io_wait < 20" | bc -l) )); then
+        # Standard build
+        build_type="standard"
+        make_jobs=$cpu_cores
+        optimization_level="-O2"
+        enable_lto="false"
+        
+        echo "Standard build: $make_jobs parallel jobs, standard optimization"
+        
+        # Configure build
+        export MAKEFLAGS="-j$make_jobs"
+        export CFLAGS="$optimization_level"
+        export CXXFLAGS="$optimization_level"
+        
+        # Standard build
+        make clean
+        make all
+        make test
+        
+    else
+        # Minimal build
+        build_type="minimal"
+        make_jobs=1
+        optimization_level="-O1"
+        enable_lto="false"
+        
+        echo "Minimal build: single-threaded, basic optimization"
+        
+        # Configure build
+        export MAKEFLAGS="-j1"
+        export CFLAGS="$optimization_level"
+        export CXXFLAGS="$optimization_level"
+        
+        # Incremental build only
+        make
+        
+        # Skip tests if system is heavily loaded
+        if (( $(echo "$disk_io_wait < 30" | bc -l) )); then
+            make test-quick
+        else
+            echo "Skipping tests due to high I/O load"
+        fi
+    fi
+    
+    build_exit_code=$?
+    
+    # Generate build report
+    build_time=$(date +%s)
+    build_size=$(du -sh build/ | cut -f1)
+    
+    echo "Build completed: type=$build_type, time=${build_time}s, size=$build_size, exit_code=$build_exit_code"
+    
+    # Send build metrics
+    curl -X POST https://ci.example.com/build-metrics \
+         -H "Content-Type: application/json" \
+         -d "{
+             \"timestamp\": \"$(date -Iseconds)\",
+             \"build_type\": \"$build_type\",
+             \"make_jobs\": $make_jobs,
+             \"optimization_level\": \"$optimization_level\",
+             \"build_time\": $build_time,
+             \"build_size\": \"$build_size\",
+             \"exit_code\": $build_exit_code,
+             \"system_resources\": {
+                 \"cpu_cores\": $cpu_cores,
+                 \"available_memory_gb\": $available_memory_gb,
+                 \"disk_io_wait\": $disk_io_wait
+             }
+         }"
+    
+    if [ $build_exit_code -eq 0 ]; then
+        echo "✅ Build successful"
+    else
+        echo "❌ Build failed"
+        exit 1
+    fi
+'
+```
+
+**Use Case**: Build system that automatically adjusts compilation settings, parallelization, and optimization levels based on available system resources, ensuring optimal build times without overwhelming the build servers.
+
+### 5. Best Practices for Load-Adaptive Scheduling
+
+#### Resource Threshold Guidelines
+```bash
+# Conservative thresholds for production systems
+rpr load-adaptive --base-interval 5m --target-cpu 60 --target-memory 70 --target-load 1.0
+
+# Aggressive thresholds for development/testing
+rpr load-adaptive --base-interval 1m --target-cpu 80 --target-memory 90 --target-load 2.0
+
+# Balanced thresholds for mixed workloads
+rpr load-adaptive --base-interval 2m --target-cpu 70 --target-memory 80 --target-load 1.5
+```
+
+#### Monitoring Load-Adaptive Behavior
+```bash
+# Monitor the adaptive scheduler's behavior
+rpr load-adaptive --base-interval 1m --target-cpu 70 --show-metrics --for 1h -- bash -c '
+    echo "=== Monitoring Adaptive Behavior $(date) ==="
+    
+    # Your actual workload here
+    ./your-workload.sh
+    
+    # The --show-metrics flag will display:
+    # - Current interval adjustments
+    # - System resource utilization
+    # - Load factor calculations
+'
+```
+
+#### Combining with Other Scheduling Types
+```bash
+# Use load-adaptive for variable workloads
+rpr load-adaptive --base-interval 5m --target-cpu 70 -- ./variable-workload.sh
+
+# Use exponential backoff for external API calls
+rpr backoff --initial 1s --max 60s -- curl external-api.com
+
+# Use rate limiting for API quotas
+rpr rate-limit --rate 100/1h -- curl rate-limited-api.com
+
+# Use fixed intervals for predictable workloads
+rpr interval --every 10m -- ./predictable-workload.sh
+```
+
 This comprehensive set of examples demonstrates the versatility and power of repeater for various continuous execution scenarios, from simple monitoring to complex distributed workflows.

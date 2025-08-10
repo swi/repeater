@@ -89,6 +89,11 @@ func (p *argParser) parse() (*Config, error) {
 		return nil, err
 	}
 
+	// Apply configuration file defaults if specified
+	if err := p.applyConfigDefaults(); err != nil {
+		return nil, err
+	}
+
 	return p.config, nil
 }
 
@@ -538,6 +543,21 @@ func validateLoadAdaptiveConfig(config *Config) error {
 	if config.MinInterval >= config.MaxInterval {
 		return errors.New("min-interval must be less than max-interval")
 	}
+
+	return nil
+}
+
+// applyConfigDefaults applies configuration file defaults to CLI config
+func (p *argParser) applyConfigDefaults() error {
+	if p.config.ConfigFile == "" {
+		return nil // No config file specified
+	}
+
+	// For now, just store the config file path for later use
+	// The actual loading and application of defaults will be done
+	// by the runner when it needs the configuration
+	// This allows the CLI parsing to succeed without requiring
+	// the config file to exist at parse time
 
 	return nil
 }
