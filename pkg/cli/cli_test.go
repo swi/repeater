@@ -614,3 +614,217 @@ func TestAdaptiveSubcommand(t *testing.T) {
 		})
 	}
 }
+
+// TestBackoffSubcommand tests the new backoff subcommand parsing
+func TestBackoffSubcommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected Config
+		wantErr  bool
+	}{
+		{
+			name: "backoff with basic parameters",
+			args: []string{"backoff", "--initial", "100ms", "--max", "10s", "--multiplier", "2.0", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:        "backoff",
+				InitialInterval:   100 * time.Millisecond,
+				BackoffMax:        10 * time.Second,
+				BackoffMultiplier: 2.0,
+				BackoffJitter:     0.0, // default
+				Command:           []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "backoff with all parameters",
+			args: []string{"backoff", "--initial", "200ms", "--max", "30s", "--multiplier", "1.5", "--jitter", "0.1", "--", "echo", "test"},
+			expected: Config{
+				Subcommand:        "backoff",
+				InitialInterval:   200 * time.Millisecond,
+				BackoffMax:        30 * time.Second,
+				BackoffMultiplier: 1.5,
+				BackoffJitter:     0.1,
+				Command:           []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "backoff abbreviations",
+			args: []string{"back", "-i", "500ms", "-x", "5s", "--", "echo", "test"},
+			expected: Config{
+				Subcommand:        "backoff",
+				InitialInterval:   500 * time.Millisecond,
+				BackoffMax:        5 * time.Second,
+				BackoffMultiplier: 2.0, // default
+				BackoffJitter:     0.0, // default
+				Command:           []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "backoff minimal abbreviation",
+			args: []string{"b", "-i", "1s", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:        "backoff",
+				InitialInterval:   time.Second,
+				BackoffMax:        30 * time.Second, // default
+				BackoffMultiplier: 2.0,              // default
+				BackoffJitter:     0.0,              // default
+				Command:           []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "backoff missing initial interval",
+			args:    []string{"backoff", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+		{
+			name:    "backoff invalid multiplier",
+			args:    []string{"backoff", "-i", "1s", "--multiplier", "0.5", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+		{
+			name:    "backoff invalid jitter",
+			args:    []string{"backoff", "-i", "1s", "--jitter", "1.5", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := ParseArgs(tt.args)
+
+			if tt.wantErr {
+				// For error cases, check both parsing and validation
+				if err == nil {
+					err = ValidateConfig(config)
+				}
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NoError(t, ValidateConfig(config))
+			assert.Equal(t, tt.expected.Subcommand, config.Subcommand)
+			assert.Equal(t, tt.expected.InitialInterval, config.InitialInterval)
+			assert.Equal(t, tt.expected.BackoffMax, config.BackoffMax)
+			assert.Equal(t, tt.expected.BackoffMultiplier, config.BackoffMultiplier)
+			assert.Equal(t, tt.expected.BackoffJitter, config.BackoffJitter)
+			assert.Equal(t, tt.expected.Command, config.Command)
+		})
+	}
+}
+
+// TestLoadAdaptiveSubcommand tests the new load-adaptive subcommand parsing
+func TestLoadAdaptiveSubcommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected Config
+		wantErr  bool
+	}{
+		{
+			name: "load-adaptive with basic parameters",
+			args: []string{"load-adaptive", "--base-interval", "1s", "--target-cpu", "70", "--target-memory", "80", "--target-load", "1.0", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:   "load-adaptive",
+				BaseInterval: time.Second,
+				TargetCPU:    70.0,
+				TargetMemory: 80.0,
+				TargetLoad:   1.0,
+				MinInterval:  100 * time.Millisecond, // base/10
+				MaxInterval:  10 * time.Second,       // base*10
+				Command:      []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "load-adaptive with all parameters",
+			args: []string{"load-adaptive", "--base-interval", "2s", "--target-cpu", "60", "--target-memory", "70", "--target-load", "0.8", "--min-interval", "500ms", "--max-interval", "30s", "--", "echo", "test"},
+			expected: Config{
+				Subcommand:   "load-adaptive",
+				BaseInterval: 2 * time.Second,
+				TargetCPU:    60.0,
+				TargetMemory: 70.0,
+				TargetLoad:   0.8,
+				MinInterval:  500 * time.Millisecond,
+				MaxInterval:  30 * time.Second,
+				Command:      []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "load-adaptive abbreviations",
+			args: []string{"load", "--base-interval", "1s", "--", "echo", "test"},
+			expected: Config{
+				Subcommand:   "load-adaptive",
+				BaseInterval: time.Second,
+				TargetCPU:    70.0,                   // default
+				TargetMemory: 80.0,                   // default
+				TargetLoad:   1.0,                    // default
+				MinInterval:  100 * time.Millisecond, // default
+				MaxInterval:  10 * time.Second,       // default
+				Command:      []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "load-adaptive minimal abbreviation",
+			args: []string{"la", "--base-interval", "500ms", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand:   "load-adaptive",
+				BaseInterval: 500 * time.Millisecond,
+				TargetCPU:    70.0,                  // default
+				TargetMemory: 80.0,                  // default
+				TargetLoad:   1.0,                   // default
+				MinInterval:  50 * time.Millisecond, // default
+				MaxInterval:  5 * time.Second,       // default
+				Command:      []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "load-adaptive missing base interval",
+			args:    []string{"load-adaptive", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+		{
+			name:    "load-adaptive invalid target cpu",
+			args:    []string{"load-adaptive", "--base-interval", "1s", "--target-cpu", "150", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+		{
+			name:    "load-adaptive invalid target memory",
+			args:    []string{"load-adaptive", "--base-interval", "1s", "--target-memory", "-10", "--", "curl", "api.com"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := ParseArgs(tt.args)
+
+			if tt.wantErr {
+				// For error cases, check both parsing and validation
+				if err == nil {
+					err = ValidateConfig(config)
+				}
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NoError(t, ValidateConfig(config))
+			assert.Equal(t, tt.expected.Subcommand, config.Subcommand)
+			assert.Equal(t, tt.expected.BaseInterval, config.BaseInterval)
+			assert.Equal(t, tt.expected.TargetCPU, config.TargetCPU)
+			assert.Equal(t, tt.expected.TargetMemory, config.TargetMemory)
+			assert.Equal(t, tt.expected.TargetLoad, config.TargetLoad)
+			assert.Equal(t, tt.expected.MinInterval, config.MinInterval)
+			assert.Equal(t, tt.expected.MaxInterval, config.MaxInterval)
+			assert.Equal(t, tt.expected.Command, config.Command)
+		})
+	}
+}

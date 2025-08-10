@@ -32,6 +32,17 @@ type Config struct {
 	FastThreshold    float64       // threshold for fast response (multiplier)
 	FailureThreshold float64       // circuit breaker failure threshold
 	ShowMetrics      bool          // show adaptive metrics
+
+	// Exponential backoff fields
+	InitialInterval   time.Duration // initial backoff interval
+	BackoffMax        time.Duration // maximum backoff interval
+	BackoffMultiplier float64       // backoff multiplier
+	BackoffJitter     float64       // jitter factor (0.0-1.0)
+
+	// Load-aware adaptive fields
+	TargetCPU    float64 // target CPU usage percentage (0-100)
+	TargetMemory float64 // target memory usage percentage (0-100)
+	TargetLoad   float64 // target load average
 }
 
 // ParseArgs parses command line arguments and returns a Config
@@ -75,6 +86,11 @@ func (p *argParser) parse() (*Config, error) {
 
 	// Parse command after --
 	if err := p.parseCommand(); err != nil {
+		return nil, err
+	}
+
+	// Apply configuration file defaults if specified
+	if err := p.applyConfigDefaults(); err != nil {
 		return nil, err
 	}
 
@@ -148,6 +164,12 @@ func normalizeSubcommand(cmd string) string {
 	// Adaptive variations
 	case "adaptive", "adapt", "a":
 		return "adaptive"
+	// Backoff variations
+	case "backoff", "back", "b":
+		return "backoff"
+	// Load-adaptive variations
+	case "load-adaptive", "load", "la":
+		return "load-adaptive"
 	default:
 		return ""
 	}
@@ -214,6 +236,34 @@ func (p *argParser) parseSubcommandFlags() error {
 		case "--show-metrics", "-m":
 			p.config.ShowMetrics = true
 			p.pos++
+		case "--initial", "-i":
+			if err := p.parseDurationFlag(&p.config.InitialInterval); err != nil {
+				return err
+			}
+		case "--max", "-x":
+			if err := p.parseDurationFlag(&p.config.BackoffMax); err != nil {
+				return err
+			}
+		case "--multiplier":
+			if err := p.parseFloatFlag(&p.config.BackoffMultiplier); err != nil {
+				return err
+			}
+		case "--jitter":
+			if err := p.parseFloatFlag(&p.config.BackoffJitter); err != nil {
+				return err
+			}
+		case "--target-cpu":
+			if err := p.parseFloatFlag(&p.config.TargetCPU); err != nil {
+				return err
+			}
+		case "--target-memory":
+			if err := p.parseFloatFlag(&p.config.TargetMemory); err != nil {
+				return err
+			}
+		case "--target-load":
+			if err := p.parseFloatFlag(&p.config.TargetLoad); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -334,6 +384,22 @@ func ValidateConfig(config *Config) error {
 		if err := validateAdaptiveConfig(config); err != nil {
 			return fmt.Errorf("invalid adaptive config: %w", err)
 		}
+	case "backoff":
+		if config.InitialInterval == 0 {
+			return errors.New("--initial is required for backoff subcommand")
+		}
+		// Validate backoff configuration
+		if err := validateBackoffConfig(config); err != nil {
+			return fmt.Errorf("invalid backoff config: %w", err)
+		}
+	case "load-adaptive":
+		if config.BaseInterval == 0 {
+			return errors.New("--base-interval is required for load-adaptive subcommand")
+		}
+		// Validate load-adaptive configuration
+		if err := validateLoadAdaptiveConfig(config); err != nil {
+			return fmt.Errorf("invalid load-adaptive config: %w", err)
+		}
 	}
 
 	return nil
@@ -409,6 +475,89 @@ func validateAdaptiveConfig(config *Config) error {
 	if config.FailureThreshold <= 0 || config.FailureThreshold >= 1.0 {
 		return errors.New("failure-threshold must be between 0 and 1.0")
 	}
+
+	return nil
+}
+
+// validateBackoffConfig validates the backoff configuration
+func validateBackoffConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.BackoffMax == 0 {
+		config.BackoffMax = 30 * time.Second
+	}
+	if config.BackoffMultiplier == 0 {
+		config.BackoffMultiplier = 2.0
+	}
+	if config.BackoffJitter < 0 {
+		config.BackoffJitter = 0.0
+	}
+
+	// Validate bounds
+	if config.InitialInterval >= config.BackoffMax {
+		return errors.New("initial interval must be less than max interval")
+	}
+
+	if config.BackoffMultiplier <= 1.0 {
+		return errors.New("multiplier must be greater than 1.0")
+	}
+
+	if config.BackoffJitter < 0 || config.BackoffJitter > 1.0 {
+		return errors.New("jitter must be between 0.0 and 1.0")
+	}
+
+	return nil
+}
+
+// validateLoadAdaptiveConfig validates the load-adaptive configuration
+func validateLoadAdaptiveConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.TargetCPU == 0 {
+		config.TargetCPU = 70.0 // Default 70% CPU target
+	}
+	if config.TargetMemory == 0 {
+		config.TargetMemory = 80.0 // Default 80% memory target
+	}
+	if config.TargetLoad == 0 {
+		config.TargetLoad = 1.0 // Default load average of 1.0
+	}
+	if config.MinInterval == 0 {
+		config.MinInterval = config.BaseInterval / 10
+	}
+	if config.MaxInterval == 0 {
+		config.MaxInterval = config.BaseInterval * 10
+	}
+
+	// Validate bounds
+	if config.TargetCPU <= 0 || config.TargetCPU > 100 {
+		return errors.New("target-cpu must be between 0 and 100")
+	}
+
+	if config.TargetMemory <= 0 || config.TargetMemory > 100 {
+		return errors.New("target-memory must be between 0 and 100")
+	}
+
+	if config.TargetLoad <= 0 {
+		return errors.New("target-load must be greater than 0")
+	}
+
+	if config.MinInterval >= config.MaxInterval {
+		return errors.New("min-interval must be less than max-interval")
+	}
+
+	return nil
+}
+
+// applyConfigDefaults applies configuration file defaults to CLI config
+func (p *argParser) applyConfigDefaults() error {
+	if p.config.ConfigFile == "" {
+		return nil // No config file specified
+	}
+
+	// For now, just store the config file path for later use
+	// The actual loading and application of defaults will be done
+	// by the runner when it needs the configuration
+	// This allows the CLI parsing to succeed without requiring
+	// the config file to exist at parse time
 
 	return nil
 }
