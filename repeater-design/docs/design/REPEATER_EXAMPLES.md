@@ -2,33 +2,121 @@
 
 ## Overview
 
-This document provides comprehensive real-world examples of using repeater (`rpr`) for various continuous execution scenarios. Examples are organized by use case and demonstrate both basic and advanced usage patterns.
+This document provides comprehensive real-world examples of using repeater (`rpr`) for various continuous execution scenarios with Unix pipeline integration. Examples are organized by use case and demonstrate both basic and advanced usage patterns.
+
+> **✅ Updated for v0.2.0 Unix Pipeline Ready** - All examples showcase the new pipeline-friendly behavior and output modes.
+
+## Output Mode Examples
+
+### Default Mode (Pipeline-Friendly)
+Clean command output perfect for Unix pipelines:
+```bash
+# Count lines of output
+rpr count --times 3 -- echo "test line" | wc -l
+# Output: 3
+
+# Extract specific data
+rpr interval --every 2s --times 5 -- date +%H:%M:%S | tail -1
+# Output: 14:23:45 (last timestamp)
+```
+
+### Quiet Mode
+Suppress all command output, show only tool errors:
+```bash
+# Silent monitoring (only exit code matters)
+rpr interval --every 30s --times 10 --quiet -- curl -f https://api.example.com
+# No output unless there's an error
+
+# Use in conditional scripts
+if rpr count --times 3 --quiet -- ping -c 1 google.com; then
+    echo "Network is up"
+fi
+```
+
+### Verbose Mode
+Full execution information plus command output:
+```bash
+# Detailed monitoring with full context
+rpr interval --every 5s --times 3 --verbose -- curl -s https://api.example.com
+# Shows execution info, command output, and final statistics
+```
+
+### Stats-Only Mode
+Show only execution statistics:
+```bash
+# Performance monitoring
+rpr count --times 100 --stats-only -- curl -w "%{time_total}\n" -o /dev/null -s https://api.example.com
+# Shows only final statistics, no individual response times
+```
+
+## Unix Pipeline Integration Examples
+
+### 1. Basic Pipeline Patterns
+
+#### Count Successful Responses
+```bash
+# Monitor API and count successful responses
+rpr interval --every 30s --times 20 -- curl -s -w "%{http_code}\n" -o /dev/null https://api.example.com | grep -c "200"
+```
+
+#### Extract and Process Data
+```bash
+# Get user data from API and extract specific fields
+rpr count --times 5 -- curl -s https://api.github.com/user | jq -r '.login'
+```
+
+#### Monitor System Metrics
+```bash
+# Track disk usage over time
+rpr duration --for 1h --every 5m -- df -h / | awk 'NR==2{print $5}' | tee disk-usage.log
+```
+
+#### Response Time Analysis
+```bash
+# Measure and analyze API response times
+rpr count --times 50 -- curl -w "%{time_total}\n" -o /dev/null -s https://api.example.com | sort -n | tail -10
+```
 
 ## Basic Usage Patterns
 
 ### 1. Health Monitoring
 
-#### Simple Health Check
+#### Simple Health Check with Pipeline
 ```bash
-# Check service health every 30 seconds for 8 hours
-rpr interval --every 30s --for 8h -- curl -f http://localhost:8080/health
+# Check service health and log status codes
+rpr interval --every 30s --for 8h -- curl -s -w "%{http_code}\n" -o /dev/null http://localhost:8080/health | tee health.log
 ```
 
-#### Health Check with Logging
+#### Health Check with Success Rate Calculation
 ```bash
-# Monitor with detailed logging and continue on failures
-rpr interval --every 30s --for 8h --continue-on-error --output-file health.log -- \
-    curl -f --max-time 10 http://api.example.com/health
+# Monitor API health and calculate success rate
+rpr interval --every 30s --times 100 -- curl -s -w "%{http_code}\n" -o /dev/null http://api.example.com/health | awk '$1==200{s++} END{print "Success rate:", s/NR*100"%"}'
 ```
 
-#### Multi-Service Health Check
+#### Multi-Service Health Check with Aggregation
 ```bash
-# Monitor multiple services in parallel
-rpr interval --every 60s --for 24h --quiet -- bash -c '
-    curl -f http://api.example.com/health && \
-    curl -f http://db.example.com/health && \
-    curl -f http://cache.example.com/health
-'
+# Monitor multiple services and count healthy ones
+rpr interval --every 60s --for 24h -- bash -c '
+    services=0
+    healthy=0
+    
+    if curl -f -s http://api.example.com/health > /dev/null; then
+        healthy=$((healthy + 1))
+    fi
+    services=$((services + 1))
+    
+    if curl -f -s http://db.example.com/health > /dev/null; then
+        healthy=$((healthy + 1))
+    fi
+    services=$((services + 1))
+    
+    if curl -f -s http://cache.example.com/health > /dev/null; then
+        healthy=$((healthy + 1))
+    fi
+    services=$((services + 1))
+    
+    echo "$healthy/$services"
+' | tee service-health.log
 ```
 
 ### 2. Data Processing

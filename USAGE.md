@@ -1,17 +1,24 @@
 # Repeater (rpr) Usage Guide
 
-A comprehensive guide to using the `rpr` command-line tool for continuous command execution with intelligent scheduling.
+A comprehensive guide to using the `rpr` command-line tool for continuous command execution with intelligent scheduling and Unix pipeline integration.
 
-> **✅ All examples in this guide are tested and working with the current implementation (v0.2.0 MVP)**
+> **✅ All examples in this guide are tested and working with the current implementation (v0.2.0 Unix Pipeline Ready)**
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Unix Pipeline Integration](#unix-pipeline-integration)
+- [Output Modes](#output-modes)
 - [Command Abbreviations](#command-abbreviations)
 - [Basic Commands](#basic-commands)
   - [Interval Execution](#interval-execution)
   - [Count-Based Execution](#count-based-execution)
   - [Duration-Based Execution](#duration-based-execution)
+- [Advanced Scheduling](#advanced-scheduling)
+  - [Rate-Limited Execution](#rate-limited-execution)
+  - [Adaptive Scheduling](#adaptive-scheduling)
+  - [Exponential Backoff](#exponential-backoff)
+  - [Load-Aware Scheduling](#load-aware-scheduling)
 - [Advanced Usage](#advanced-usage)
   - [Combining Parameters](#combining-parameters)
   - [Working with Complex Commands](#working-with-complex-commands)
@@ -21,6 +28,7 @@ A comprehensive guide to using the `rpr` command-line tool for continuous comman
   - [Development & Testing](#development--testing)
   - [System Administration](#system-administration)
   - [Data Processing](#data-processing)
+- [Exit Codes for Scripting](#exit-codes-for-scripting)
 - [Tips & Best Practices](#tips--best-practices)
 
 ## Quick Start
@@ -33,7 +41,80 @@ rpr [GLOBAL OPTIONS] <SUBCOMMAND> [OPTIONS] -- <COMMAND>
 **Key Points:**
 - Use `--` to separate repeater options from the command you want to run
 - Commands are executed exactly as you would run them manually
-- All output is preserved and displayed in real-time
+- **Unix-friendly by default**: Clean output perfect for pipes and scripts
+- **Streaming output**: Real-time command output for immediate processing
+- **Standard exit codes**: 0 (success), 1 (failures), 2 (usage error), 130 (interrupted)
+
+## Unix Pipeline Integration
+
+Repeater is designed to work seamlessly with Unix pipelines and standard tools:
+
+```bash
+# Count successful API responses
+rpr interval --every 5s --times 10 -- curl -s https://api.example.com | grep -c "success"
+
+# Monitor disk usage and log changes
+rpr duration --for 1h --every 5m -- df -h / | awk '{print $5}' | tee disk-usage.log
+
+# Extract data from repeated API calls
+rpr count --times 5 -- curl -s https://api.github.com/user | jq -r '.login'
+
+# Test response times and analyze
+rpr i -e 1s -t 20 -- curl -w "%{time_total}\n" -o /dev/null -s https://api.com | sort -n
+```
+
+## Output Modes
+
+Repeater provides different output modes for various use cases:
+
+### Default Mode (Pipeline-Friendly)
+Clean command output with no decorative elements, perfect for Unix pipelines:
+```bash
+rpr interval --every 2s --times 3 -- echo "test"
+# Output:
+# test
+# test  
+# test
+```
+
+### Quiet Mode (`--quiet`, `-q`)
+Suppresses all command output, shows only tool errors:
+```bash
+rpr interval --every 2s --times 3 --quiet -- echo "test"
+# No output unless there's a tool error
+```
+
+### Verbose Mode (`--verbose`, `-v`)
+Shows full execution information plus command output:
+```bash
+rpr interval --every 2s --times 3 --verbose -- echo "test"
+# Output:
+# 🕐 Interval execution: every 2s, 3 times
+# 📋 Command: [echo test]
+# 🚀 Starting execution...
+# test
+# test
+# test
+# ✅ Execution completed!
+# 📊 Statistics:
+#    Total executions: 3
+#    Successful: 3
+#    Failed: 0
+#    Duration: 4.002s
+```
+
+### Stats-Only Mode (`--stats-only`)
+Shows only execution statistics, suppresses command output:
+```bash
+rpr interval --every 2s --times 3 --stats-only -- echo "test"
+# Output:
+# ✅ Execution completed!
+# 📊 Statistics:
+#    Total executions: 3
+#    Successful: 3
+#    Failed: 0
+#    Duration: 4.002s
+```
 
 ## Command Abbreviations
 
@@ -46,6 +127,10 @@ Repeater supports multiple levels of abbreviations for faster typing:
 | `interval` | `int` | `i` | `rpr i -e 30s -- curl api.com` |
 | `count` | `cnt` | `c` | `rpr c -t 5 -- echo hello` |
 | `duration` | `dur` | `d` | `rpr d -f 1m -- date` |
+| `rate-limit` | `rate` | `rl` | `rpr rl -r 10/1h -- curl api.com` |
+| `adaptive` | `adapt` | `a` | `rpr a -b 1s -- curl api.com` |
+| `backoff` | `back` | `b` | `rpr b -i 100ms -- curl api.com` |
+| `load-adaptive` | `load` | `la` | `rpr la -b 1s -- ./task.sh` |
 
 ### Flag Abbreviations
 
@@ -191,6 +276,118 @@ rpr duration --for 5m --every 30s -- free -h
 ```
 *Use case: Monitor memory usage during a specific operation*
 
+## Advanced Scheduling
+
+### Rate-Limited Execution
+
+Execute commands with server-friendly rate limiting to avoid overwhelming APIs or services.
+
+#### Basic Syntax
+```bash
+rpr rate-limit --rate <rate_spec> -- <command>
+```
+
+#### Examples
+
+**API calls with hourly rate limit:**
+```bash
+rpr rate-limit --rate 100/1h -- curl https://api.github.com/user
+```
+*Use case: Stay within API rate limits*
+
+**Database queries with per-minute limit:**
+```bash
+rpr rate-limit --rate 10/1m -- mysql -e "SELECT COUNT(*) FROM users"
+```
+*Use case: Avoid overwhelming database with queries*
+
+**With retry pattern:**
+```bash
+rpr rate-limit --rate 50/1h --retry-pattern 0,5m,15m -- curl https://api.example.com
+```
+*Use case: Retry failed requests with exponential delays*
+
+### Adaptive Scheduling
+
+Automatically adjust execution intervals based on command response times and success rates.
+
+#### Basic Syntax
+```bash
+rpr adaptive --base-interval <duration> [OPTIONS] -- <command>
+```
+
+#### Examples
+
+**API monitoring with adaptive intervals:**
+```bash
+rpr adaptive --base-interval 1s --show-metrics -- curl https://api.example.com/health
+```
+*Use case: Increase frequency when API is fast, decrease when slow*
+
+**Database health check with bounds:**
+```bash
+rpr adaptive --base-interval 30s --min-interval 10s --max-interval 5m -- mysql -e "SELECT 1"
+```
+*Use case: Adaptive monitoring with safety bounds*
+
+**Load testing with failure threshold:**
+```bash
+rpr adaptive --base-interval 500ms --failure-threshold 0.2 --times 100 -- curl https://api.com/test
+```
+*Use case: Back off when failure rate exceeds 20%*
+
+### Exponential Backoff
+
+Implement exponential backoff for resilient execution against unreliable services.
+
+#### Basic Syntax
+```bash
+rpr backoff --initial <duration> [OPTIONS] -- <command>
+```
+
+#### Examples
+
+**Retry unreliable API with backoff:**
+```bash
+rpr backoff --initial 100ms --max 30s --multiplier 2.0 -- curl https://flaky-api.com
+```
+*Use case: Resilient API calls with exponential delays*
+
+**Database connection with jitter:**
+```bash
+rpr backoff --initial 1s --max 60s --jitter 0.1 --times 10 -- mysql -e "SELECT 1"
+```
+*Use case: Avoid thundering herd with randomized delays*
+
+### Load-Aware Scheduling
+
+Automatically adjust execution frequency based on system resource usage (CPU, memory, load average).
+
+#### Basic Syntax
+```bash
+rpr load-adaptive --base-interval <duration> [OPTIONS] -- <command>
+```
+
+#### Examples
+
+**CPU-intensive task with load awareness:**
+```bash
+rpr load-adaptive --base-interval 1s --target-cpu 70 -- ./cpu-intensive-task.sh
+```
+*Use case: Scale back when CPU usage is high*
+
+**Memory-sensitive processing:**
+```bash
+rpr load-adaptive --base-interval 30s --target-memory 80 --target-load 1.5 -- ./process-data.sh
+```
+*Use case: Adjust frequency based on memory pressure and system load*
+
+**Development environment monitoring:**
+```bash
+rpr load-adaptive --base-interval 5s --target-cpu 60 --show-metrics -- npm test
+```
+*Use case: Run tests more frequently when system is idle*
+
 ## Advanced Usage
 
 ### Combining Parameters
@@ -237,20 +434,20 @@ rpr interval --every 10s --times 20 -- curl -f --max-time 5 https://unreliable-a
 
 ### Monitoring & Health Checks
 
-**Website uptime monitoring:**
+**Website uptime monitoring with logging:**
 ```bash
-# Check every 30 seconds for 1 hour
-rpr duration --for 1h --every 30s -- curl -f -s -o /dev/null https://mysite.com
+# Check every 30 seconds for 1 hour, log status codes
+rpr duration --for 1h --every 30s -- curl -w "%{http_code}\n" -s -o /dev/null https://mysite.com | tee uptime.log
 # Abbreviated form:
-rpr d -f 1h -e 30s -- curl -f -s -o /dev/null https://mysite.com
+rpr d -f 1h -e 30s -- curl -w "%{http_code}\n" -s -o /dev/null https://mysite.com | tee uptime.log
 ```
 
-**Database connection testing:**
+**Database connection testing with success counting:**
 ```bash
-# Test connection 10 times with 5-second intervals
-rpr count --times 10 --every 5s -- mysql -h db.example.com -u user -p -e "SELECT 1"
+# Test connection 10 times, count successful connections
+rpr count --times 10 --every 5s -- mysql -h db.example.com -u user -p -e "SELECT 1" | grep -c "1"
 # Abbreviated form:
-rpr c -t 10 -e 5s -- mysql -h db.example.com -u user -p -e "SELECT 1"
+rpr c -t 10 -e 5s -- mysql -h db.example.com -u user -p -e "SELECT 1" | grep -c "1"
 ```
 
 **SSL certificate expiration check:**
@@ -384,12 +581,52 @@ rpr interval --every 30s -- sh -c "curl -s https://api.com >> success.log 2>> er
 - **Ctrl+C** (SIGINT): Gracefully stops execution after current command completes
 - **SIGTERM**: Gracefully stops execution (useful in scripts and containers)
 
-### Exit Codes
+## Exit Codes for Scripting
 
-- `0`: All executions completed successfully
-- `1`: Configuration or argument error
-- `2`: Command execution failed (when applicable)
-- `130`: Interrupted by user (Ctrl+C)
+Repeater follows Unix conventions for exit codes, making it perfect for use in scripts and automation:
+
+### Exit Code Reference
+
+- **0**: All commands executed successfully
+- **1**: Some commands failed during execution  
+- **2**: Usage error (invalid arguments, configuration issues)
+- **130**: Interrupted by user (Ctrl+C, SIGINT, SIGTERM)
+
+### Scripting Examples
+
+**Basic success/failure handling:**
+```bash
+if rpr interval --every 5s --times 3 --quiet -- curl -f https://api.example.com; then
+    echo "API is healthy"
+else
+    echo "API check failed with exit code $?"
+fi
+```
+
+**Chain with other Unix tools:**
+```bash
+rpr count --times 5 -- curl -s https://api.example.com | jq .status && echo "Success" || echo "Failed"
+```
+
+**Use in conditional execution:**
+```bash
+# Only proceed if health check passes
+rpr i -e 2s -t 3 --quiet -- curl -f https://api.com/health && ./deploy.sh
+```
+
+**Capture and handle different exit codes:**
+```bash
+rpr interval --every 10s --times 5 --quiet -- curl -f https://api.example.com
+exit_code=$?
+
+case $exit_code in
+    0)   echo "All health checks passed" ;;
+    1)   echo "Some health checks failed" ;;
+    2)   echo "Configuration error" ;;
+    130) echo "Interrupted by user" ;;
+    *)   echo "Unexpected exit code: $exit_code" ;;
+esac
+```
 
 ---
 
