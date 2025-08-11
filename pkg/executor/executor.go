@@ -1,11 +1,15 @@
 package executor
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -20,7 +24,11 @@ type ExecutionResult struct {
 
 // Executor handles command execution with configurable options
 type Executor struct {
-	timeout time.Duration
+	timeout      time.Duration
+	streamWriter io.Writer
+	quietMode    bool
+	verboseMode  bool
+	outputPrefix string
 }
 
 // Option represents a configuration option for the executor
@@ -33,6 +41,38 @@ func WithTimeout(timeout time.Duration) Option {
 			return errors.New("timeout must be positive")
 		}
 		e.timeout = timeout
+		return nil
+	}
+}
+
+// WithStreaming enables real-time output streaming to the provided writer
+func WithStreaming(writer io.Writer) Option {
+	return func(e *Executor) error {
+		e.streamWriter = writer
+		return nil
+	}
+}
+
+// WithQuietMode suppresses all output streaming
+func WithQuietMode() Option {
+	return func(e *Executor) error {
+		e.quietMode = true
+		return nil
+	}
+}
+
+// WithVerboseMode enables verbose output with additional details
+func WithVerboseMode() Option {
+	return func(e *Executor) error {
+		e.verboseMode = true
+		return nil
+	}
+}
+
+// WithOutputPrefix sets a prefix for all streamed output lines
+func WithOutputPrefix(prefix string) Option {
+	return func(e *Executor) error {
+		e.outputPrefix = prefix
 		return nil
 	}
 }
@@ -73,11 +113,51 @@ func (e *Executor) Execute(ctx context.Context, command []string) (*ExecutionRes
 
 	// Prepare output buffers
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	var err error
 
-	// Execute the command
-	err := cmd.Run()
+	// Set up streaming if enabled and not in quiet mode
+	if e.streamWriter != nil && !e.quietMode {
+		// Create pipes for real-time streaming
+		stdoutPipe, pipeErr := cmd.StdoutPipe()
+		if pipeErr != nil {
+			return nil, fmt.Errorf("failed to create stdout pipe: %w", pipeErr)
+		}
+		stderrPipe, pipeErr := cmd.StderrPipe()
+		if pipeErr != nil {
+			return nil, fmt.Errorf("failed to create stderr pipe: %w", pipeErr)
+		}
+
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			return nil, fmt.Errorf("failed to start command: %w", err)
+		}
+
+		// Stream output in real-time while capturing
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			e.streamOutput(stdoutPipe, &stdout, "stdout", command)
+		}()
+
+		go func() {
+			defer wg.Done()
+			e.streamOutput(stderrPipe, &stderr, "stderr", command)
+		}()
+
+		// Wait for command to complete
+		err = cmd.Wait()
+
+		// Wait for streaming to complete
+		wg.Wait()
+	} else {
+		// Standard execution without streaming
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err = cmd.Run()
+	}
+
 	duration := time.Since(start)
 
 	// Create result with common fields
@@ -117,4 +197,37 @@ func (e *Executor) handleExecutionError(err error, execCtx context.Context, resu
 
 	// Other errors (command not found, etc.)
 	return nil, fmt.Errorf("command execution failed: %w", err)
+}
+
+// streamOutput handles real-time streaming of command output
+func (e *Executor) streamOutput(pipe io.ReadCloser, buffer *bytes.Buffer, streamType string, command []string) {
+	defer pipe.Close()
+
+	scanner := bufio.NewScanner(pipe)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Write to buffer for result capture
+		buffer.WriteString(line + "\n")
+
+		// Stream to writer if enabled
+		if e.streamWriter != nil && !e.quietMode {
+			output := strings.TrimSpace(line)
+			// Add verbose information first
+			if e.verboseMode {
+				cmdName := command[0]
+				output = fmt.Sprintf("[%s:%s] %s", streamType, cmdName, output)
+			}
+
+			// Add prefix if specified
+			if e.outputPrefix != "" {
+				if strings.HasSuffix(e.outputPrefix, " ") {
+					output = e.outputPrefix + output
+				} else {
+					output = e.outputPrefix + " " + output
+				}
+			}
+			fmt.Fprintln(e.streamWriter, output)
+		}
+	}
 }

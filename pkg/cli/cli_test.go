@@ -8,6 +8,108 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestOutputControlFlags tests the new output control flags
+func TestOutputControlFlags(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected Config
+		wantErr  bool
+	}{
+		{
+			name: "interval with stream flag",
+			args: []string{"interval", "--every", "1s", "--stream", "--", "echo", "test"},
+			expected: Config{
+				Subcommand: "interval",
+				Every:      1 * time.Second,
+				Stream:     true,
+				Command:    []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "interval with quiet flag",
+			args: []string{"interval", "--every", "1s", "--quiet", "--", "echo", "test"},
+			expected: Config{
+				Subcommand: "interval",
+				Every:      1 * time.Second,
+				Quiet:      true,
+				Command:    []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "interval with verbose flag",
+			args: []string{"interval", "--every", "1s", "--verbose", "--", "echo", "test"},
+			expected: Config{
+				Subcommand: "interval",
+				Every:      1 * time.Second,
+				Verbose:    true,
+				Command:    []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "count with stream and verbose flags",
+			args: []string{"count", "--times", "5", "--stream", "--verbose", "--", "curl", "api.com"},
+			expected: Config{
+				Subcommand: "count",
+				Times:      5,
+				Stream:     true,
+				Verbose:    true,
+				Command:    []string{"curl", "api.com"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "duration with output prefix",
+			args: []string{"duration", "--for", "1m", "--stream", "--output-prefix", "[CMD]", "--", "echo", "test"},
+			expected: Config{
+				Subcommand:   "duration",
+				For:          1 * time.Minute,
+				Stream:       true,
+				OutputPrefix: "[CMD]",
+				Command:      []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name:     "conflicting quiet and stream flags",
+			args:     []string{"interval", "--every", "1s", "--quiet", "--stream", "--", "echo", "test"},
+			expected: Config{},
+			wantErr:  true,
+		},
+		{
+			name:     "conflicting quiet and verbose flags",
+			args:     []string{"interval", "--every", "1s", "--quiet", "--verbose", "--", "echo", "test"},
+			expected: Config{},
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := ParseArgs(tt.args)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Subcommand, config.Subcommand)
+			assert.Equal(t, tt.expected.Every, config.Every)
+			assert.Equal(t, tt.expected.Times, config.Times)
+			assert.Equal(t, tt.expected.For, config.For)
+			assert.Equal(t, tt.expected.Stream, config.Stream)
+			assert.Equal(t, tt.expected.Quiet, config.Quiet)
+			assert.Equal(t, tt.expected.Verbose, config.Verbose)
+			assert.Equal(t, tt.expected.OutputPrefix, config.OutputPrefix)
+			assert.Equal(t, tt.expected.Command, config.Command)
+		})
+	}
+}
+
 // TestRateLimitSubcommand tests the new rate-limit subcommand parsing
 func TestRateLimitSubcommand(t *testing.T) {
 	tests := []struct {
@@ -824,6 +926,69 @@ func TestLoadAdaptiveSubcommand(t *testing.T) {
 			assert.Equal(t, tt.expected.TargetLoad, config.TargetLoad)
 			assert.Equal(t, tt.expected.MinInterval, config.MinInterval)
 			assert.Equal(t, tt.expected.MaxInterval, config.MaxInterval)
+			assert.Equal(t, tt.expected.Command, config.Command)
+		})
+	}
+}
+
+// TestStatsOnlyFlag tests the new --stats-only flag
+func TestStatsOnlyFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected Config
+		wantErr  bool
+	}{
+		{
+			name: "interval with stats-only flag",
+			args: []string{"interval", "--every", "1s", "--stats-only", "--", "echo", "test"},
+			expected: Config{
+				Subcommand: "interval",
+				Every:      1 * time.Second,
+				StatsOnly:  true,
+				Command:    []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "count with stats-only flag",
+			args: []string{"count", "--times", "3", "--stats-only", "--", "date"},
+			expected: Config{
+				Subcommand: "count",
+				Times:      3,
+				StatsOnly:  true,
+				Command:    []string{"date"},
+			},
+			wantErr: false,
+		},
+		{
+			name:     "conflicting stats-only and stream flags",
+			args:     []string{"count", "--times", "3", "--stats-only", "--stream", "--", "echo", "test"},
+			expected: Config{},
+			wantErr:  true,
+		},
+		{
+			name:     "conflicting stats-only and verbose flags",
+			args:     []string{"count", "--times", "3", "--stats-only", "--verbose", "--", "echo", "test"},
+			expected: Config{},
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := ParseArgs(tt.args)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Subcommand, config.Subcommand)
+			assert.Equal(t, tt.expected.Every, config.Every)
+			assert.Equal(t, tt.expected.Times, config.Times)
+			assert.Equal(t, tt.expected.StatsOnly, config.StatsOnly)
 			assert.Equal(t, tt.expected.Command, config.Command)
 		})
 	}

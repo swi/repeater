@@ -12,13 +12,23 @@ import (
 	"github.com/swi/repeater/pkg/runner"
 )
 
+// ExitError represents an error with a specific exit code
+type ExitError struct {
+	Code    int
+	Message string
+}
+
+func (e *ExitError) Error() string {
+	return e.Message
+}
+
 const version = "0.2.0"
 
 func main() {
 	config, err := cli.ParseArgs(os.Args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		os.Exit(2) // Usage error
 	}
 
 	// Handle special cases first
@@ -35,13 +45,19 @@ func main() {
 	// Validate configuration
 	if err := cli.ValidateConfig(config); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		os.Exit(2) // Usage error
 	}
 
 	// Execute using the integrated runner system
 	if err := executeCommand(config); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+
+		// Handle different exit codes
+		if exitErr, ok := err.(*ExitError); ok {
+			os.Exit(exitErr.Code)
+		} else {
+			os.Exit(1) // General error
+		}
 	}
 }
 
@@ -82,22 +98,42 @@ func showHelp() {
 	fmt.Println("  --target-memory FLOAT      Target memory usage % for load-adaptive (default: 80)")
 	fmt.Println("  --target-load FLOAT        Target load average for load-adaptive (default: 1.0)")
 	fmt.Println()
+	fmt.Println("OUTPUT CONTROL:")
+	fmt.Println("  --quiet, -q                Suppress command output, show only tool errors")
+	fmt.Println("  --verbose, -v              Show detailed execution info + command output")
+	fmt.Println("  --stats-only               Show only execution statistics")
+	fmt.Println("  --stream, -s               Force streaming output (default for pipeline mode)")
+	fmt.Println()
 	fmt.Println("EXAMPLES:")
+	fmt.Println("  # Basic usage")
 	fmt.Println("  rpr interval --every 30s --times 10 -- curl http://example.com")
 	fmt.Println("  rpr i -e 30s -t 10 -- curl http://example.com")
 	fmt.Println("  rpr count --times 5 -- echo 'Hello World'")
 	fmt.Println("  rpr c -t 5 -- echo 'Hello World'")
 	fmt.Println("  rpr duration --for 2m --every 10s -- date")
 	fmt.Println("  rpr d -f 2m -e 10s -- date")
+	fmt.Println()
+	fmt.Println("  # Unix pipeline integration")
+	fmt.Println("  rpr i -e 5s -t 10 -- curl -s https://api.com | jq .status")
+	fmt.Println("  rpr c -t 20 -- curl -w \"%{time_total}\\n\" -s -o /dev/null api.com | sort -n")
+	fmt.Println("  rpr d -f 1h -e 5m -- df -h / | awk 'NR==2{print $5}' | tee disk.log")
+	fmt.Println()
+	fmt.Println("  # Advanced scheduling")
 	fmt.Println("  rpr rate-limit --rate 100/1h -- curl https://api.github.com/user")
-	fmt.Println("  rpr rl -r 10/1m --retry-pattern 0,5m,15m -- curl api.com")
-	fmt.Println("  rpr rate-limit -r 60/1h --show-next -- curl api.example.com")
 	fmt.Println("  rpr adaptive --base-interval 1s --show-metrics -- curl api.com")
-	fmt.Println("  rpr a -b 500ms --times 10 -- echo 'adaptive test'")
-	fmt.Println("  rpr backoff --initial 100ms --max 30s --multiplier 2.0 -- curl api.com")
-	fmt.Println("  rpr b -i 200ms -x 10s --jitter 0.1 -- echo 'backoff test'")
-	fmt.Println("  rpr load-adaptive --base-interval 1s --target-cpu 60 -- curl api.com")
-	fmt.Println("  rpr la --base-interval 500ms --target-memory 70 -- echo 'load test'")
+	fmt.Println("  rpr backoff --initial 100ms --max 30s -- curl flaky-api.com")
+	fmt.Println("  rpr load-adaptive --base-interval 1s --target-cpu 70 -- ./task.sh")
+	fmt.Println()
+	fmt.Println("  # Output modes")
+	fmt.Println("  rpr i -e 5s -t 3 --quiet -- curl https://api.com  # Silent")
+	fmt.Println("  rpr i -e 5s -t 3 --verbose -- curl https://api.com  # Detailed")
+	fmt.Println("  rpr i -e 5s -t 3 --stats-only -- curl https://api.com  # Stats only")
+	fmt.Println()
+	fmt.Println("EXIT CODES:")
+	fmt.Println("  0   All commands succeeded")
+	fmt.Println("  1   Some commands failed")
+	fmt.Println("  2   Usage error")
+	fmt.Println("  130 Interrupted (Ctrl+C)")
 	fmt.Println()
 	fmt.Println("For more information, see: https://github.com/swi/repeater")
 }
@@ -107,6 +143,11 @@ func showVersion() {
 }
 
 func executeCommand(config *cli.Config) error {
+	// Apply Unix pipeline behavior: make streaming default unless quiet or stats-only mode
+	if !config.Quiet && !config.StatsOnly && !config.Stream {
+		config.Stream = true
+	}
+
 	// Create runner
 	r, err := runner.NewRunner(config)
 	if err != nil {
@@ -122,22 +163,38 @@ func executeCommand(config *cli.Config) error {
 
 	go func() {
 		<-sigChan
-		fmt.Fprintf(os.Stderr, "\n🛑 Received interrupt signal, shutting down gracefully...\n")
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "\nReceived interrupt signal, shutting down gracefully...\n")
+		}
 		cancel()
 	}()
 
-	// Show execution info
-	showExecutionInfo(config)
+	// Unix pipeline behavior: only show execution info in verbose mode
+	if config.Verbose {
+		showExecutionInfo(config)
+	}
 
 	// Run the command
 	stats, err := r.Run(ctx)
-	if err != nil && ctx.Err() == nil {
-		// Error that's not from cancellation
-		return fmt.Errorf("execution failed: %w", err)
+	if err != nil {
+		if ctx.Err() == context.Canceled {
+			// Interrupted by signal (Ctrl+C)
+			return &ExitError{Code: 130, Message: "interrupted"}
+		}
+		// Other execution errors
+		return &ExitError{Code: 1, Message: fmt.Sprintf("execution failed: %v", err)}
 	}
 
-	// Show results
-	showExecutionResults(stats)
+	// Unix pipeline behavior: show results in verbose or stats-only mode
+	if config.Verbose || config.StatsOnly {
+		showExecutionResults(stats)
+	}
+
+	// Check if any commands failed
+	if stats != nil && stats.FailedExecutions > 0 {
+		return &ExitError{Code: 1, Message: "some commands failed"}
+	}
+
 	return nil
 }
 

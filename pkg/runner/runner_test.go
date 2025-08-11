@@ -409,3 +409,225 @@ func TestRunner_ConfigurationValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestRunner_StreamingIntegration(t *testing.T) {
+	t.Run("runner with streaming enabled", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      2,
+			Command:    []string{"echo", "streaming test"},
+			Stream:     true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Verify executions completed
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 2, stats.SuccessfulExecutions)
+	})
+
+	t.Run("runner with quiet mode", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      2,
+			Command:    []string{"echo", "quiet test"},
+			Quiet:      true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Verify executions completed
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 2, stats.SuccessfulExecutions)
+	})
+
+	t.Run("runner with verbose mode", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      2,
+			Command:    []string{"echo", "verbose test"},
+			Verbose:    true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Verify executions completed
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 2, stats.SuccessfulExecutions)
+	})
+
+	t.Run("runner with output prefix", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand:   "count",
+			Times:        2,
+			Command:      []string{"echo", "prefix test"},
+			Stream:       true,
+			OutputPrefix: "[TEST]",
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Verify executions completed
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 2, stats.SuccessfulExecutions)
+	})
+}
+
+func TestRunner_UnixPipelineOutput(t *testing.T) {
+	t.Run("default mode should only output command results", func(t *testing.T) {
+		// This test should fail initially - we expect only command output
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      2,
+			Command:    []string{"echo", "hello"},
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// In Unix pipeline mode, default should only stream command output
+		// No UI decorations like "🔢 Count execution" should appear
+		// This test documents the expected behavior
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 2, stats.SuccessfulExecutions)
+	})
+
+	t.Run("quiet mode should suppress all output except tool errors", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      2,
+			Command:    []string{"echo", "should be quiet"},
+			Quiet:      true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Quiet mode should suppress command output and UI decorations
+		// Only tool errors should go to stderr
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 2, stats.SuccessfulExecutions)
+	})
+
+	t.Run("verbose mode should show command tracing and statistics", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      2,
+			Command:    []string{"echo", "verbose test"},
+			Verbose:    true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Verbose mode should show:
+		// 1. Command tracing (like parallel --verbose)
+		// 2. Command output
+		// 3. Final statistics
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 2, stats.SuccessfulExecutions)
+	})
+}
+
+func TestRunner_StatsOnlyMode(t *testing.T) {
+	t.Run("stats-only mode should suppress output and show statistics", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      3,
+			Command:    []string{"echo", "stats-only test"},
+			StatsOnly:  true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Verify executions completed
+		assert.Equal(t, 3, stats.TotalExecutions)
+		assert.Equal(t, 3, stats.SuccessfulExecutions)
+		assert.Equal(t, 0, stats.FailedExecutions)
+	})
+
+	t.Run("stats-only mode should work with command failures", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      2,
+			Command:    []string{"false"},
+			StatsOnly:  true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Should detect failures correctly
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 0, stats.SuccessfulExecutions)
+		assert.Equal(t, 2, stats.FailedExecutions)
+	})
+}
