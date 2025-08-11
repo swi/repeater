@@ -107,6 +107,11 @@ func showVersion() {
 }
 
 func executeCommand(config *cli.Config) error {
+	// Apply Unix pipeline behavior: make streaming default unless quiet mode
+	if !config.Quiet && !config.Stream {
+		config.Stream = true
+	}
+
 	// Create runner
 	r, err := runner.NewRunner(config)
 	if err != nil {
@@ -122,12 +127,16 @@ func executeCommand(config *cli.Config) error {
 
 	go func() {
 		<-sigChan
-		fmt.Fprintf(os.Stderr, "\n🛑 Received interrupt signal, shutting down gracefully...\n")
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "\nReceived interrupt signal, shutting down gracefully...\n")
+		}
 		cancel()
 	}()
 
-	// Show execution info
-	showExecutionInfo(config)
+	// Unix pipeline behavior: only show execution info in verbose mode
+	if config.Verbose {
+		showExecutionInfo(config)
+	}
 
 	// Run the command
 	stats, err := r.Run(ctx)
@@ -136,8 +145,11 @@ func executeCommand(config *cli.Config) error {
 		return fmt.Errorf("execution failed: %w", err)
 	}
 
-	// Show results
-	showExecutionResults(stats)
+	// Unix pipeline behavior: only show results in verbose mode
+	if config.Verbose {
+		showExecutionResults(stats)
+	}
+
 	return nil
 }
 

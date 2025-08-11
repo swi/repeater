@@ -43,6 +43,12 @@ type Config struct {
 	TargetCPU    float64 // target CPU usage percentage (0-100)
 	TargetMemory float64 // target memory usage percentage (0-100)
 	TargetLoad   float64 // target load average
+
+	// Output control fields
+	Stream       bool   // stream command output in real-time
+	Quiet        bool   // suppress all output
+	Verbose      bool   // show detailed execution information
+	OutputPrefix string // prefix for output lines
 }
 
 // ParseArgs parses command line arguments and returns a Config
@@ -91,6 +97,11 @@ func (p *argParser) parse() (*Config, error) {
 
 	// Apply configuration file defaults if specified
 	if err := p.applyConfigDefaults(); err != nil {
+		return nil, err
+	}
+
+	// Validate the final configuration
+	if err := ValidateConfig(p.config); err != nil {
 		return nil, err
 	}
 
@@ -264,6 +275,19 @@ func (p *argParser) parseSubcommandFlags() error {
 			if err := p.parseFloatFlag(&p.config.TargetLoad); err != nil {
 				return err
 			}
+		case "--stream", "-s":
+			p.config.Stream = true
+			p.pos++
+		case "--quiet", "-q":
+			p.config.Quiet = true
+			p.pos++
+		case "--verbose", "-v":
+			p.config.Verbose = true
+			p.pos++
+		case "--output-prefix", "-o":
+			if err := p.parseStringFlag(&p.config.OutputPrefix); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -352,6 +376,11 @@ func ValidateConfig(config *Config) error {
 
 	if len(config.Command) == 0 {
 		return errors.New("command required after --")
+	}
+
+	// Validate output control flags
+	if err := validateOutputFlags(config); err != nil {
+		return err
 	}
 
 	// Validate subcommand-specific requirements
@@ -558,6 +587,22 @@ func (p *argParser) applyConfigDefaults() error {
 	// by the runner when it needs the configuration
 	// This allows the CLI parsing to succeed without requiring
 	// the config file to exist at parse time
+
+	return nil
+}
+
+// validateOutputFlags validates output control flags for conflicts
+func validateOutputFlags(config *Config) error {
+	// Check for conflicting flags
+	if config.Quiet && config.Stream {
+		return errors.New("--quiet and --stream flags are mutually exclusive")
+	}
+
+	if config.Quiet && config.Verbose {
+		return errors.New("--quiet and --verbose flags are mutually exclusive")
+	}
+
+	// Note: --stream and --verbose can be used together for detailed streaming
 
 	return nil
 }

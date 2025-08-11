@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -94,8 +95,24 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 	startTime := time.Now()
 
-	// Create executor
-	exec, err := executor.NewExecutor()
+	// Create executor with streaming options from config
+	var executorOptions []executor.Option
+
+	// Add streaming options based on config
+	if r.config.Stream {
+		executorOptions = append(executorOptions, executor.WithStreaming(os.Stdout))
+	}
+	if r.config.Quiet {
+		executorOptions = append(executorOptions, executor.WithQuietMode())
+	}
+	if r.config.Verbose {
+		executorOptions = append(executorOptions, executor.WithVerboseMode())
+	}
+	if r.config.OutputPrefix != "" {
+		executorOptions = append(executorOptions, executor.WithOutputPrefix(r.config.OutputPrefix))
+	}
+
+	exec, err := executor.NewExecutor(executorOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create executor: %w", err)
 	}
