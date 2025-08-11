@@ -102,7 +102,7 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 	if r.config.Stream {
 		executorOptions = append(executorOptions, executor.WithStreaming(os.Stdout))
 	}
-	if r.config.Quiet {
+	if r.config.Quiet || r.config.StatsOnly {
 		executorOptions = append(executorOptions, executor.WithQuietMode())
 	}
 	if r.config.Verbose {

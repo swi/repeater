@@ -930,3 +930,66 @@ func TestLoadAdaptiveSubcommand(t *testing.T) {
 		})
 	}
 }
+
+// TestStatsOnlyFlag tests the new --stats-only flag
+func TestStatsOnlyFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected Config
+		wantErr  bool
+	}{
+		{
+			name: "interval with stats-only flag",
+			args: []string{"interval", "--every", "1s", "--stats-only", "--", "echo", "test"},
+			expected: Config{
+				Subcommand: "interval",
+				Every:      1 * time.Second,
+				StatsOnly:  true,
+				Command:    []string{"echo", "test"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "count with stats-only flag",
+			args: []string{"count", "--times", "3", "--stats-only", "--", "date"},
+			expected: Config{
+				Subcommand: "count",
+				Times:      3,
+				StatsOnly:  true,
+				Command:    []string{"date"},
+			},
+			wantErr: false,
+		},
+		{
+			name:     "conflicting stats-only and stream flags",
+			args:     []string{"count", "--times", "3", "--stats-only", "--stream", "--", "echo", "test"},
+			expected: Config{},
+			wantErr:  true,
+		},
+		{
+			name:     "conflicting stats-only and verbose flags",
+			args:     []string{"count", "--times", "3", "--stats-only", "--verbose", "--", "echo", "test"},
+			expected: Config{},
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := ParseArgs(tt.args)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Subcommand, config.Subcommand)
+			assert.Equal(t, tt.expected.Every, config.Every)
+			assert.Equal(t, tt.expected.Times, config.Times)
+			assert.Equal(t, tt.expected.StatsOnly, config.StatsOnly)
+			assert.Equal(t, tt.expected.Command, config.Command)
+		})
+	}
+}

@@ -48,6 +48,7 @@ type Config struct {
 	Stream       bool   // stream command output in real-time
 	Quiet        bool   // suppress all output
 	Verbose      bool   // show detailed execution information
+	StatsOnly    bool   // show only statistics, suppress command output
 	OutputPrefix string // prefix for output lines
 }
 
@@ -283,6 +284,9 @@ func (p *argParser) parseSubcommandFlags() error {
 			p.pos++
 		case "--verbose", "-v":
 			p.config.Verbose = true
+			p.pos++
+		case "--stats-only":
+			p.config.StatsOnly = true
 			p.pos++
 		case "--output-prefix", "-o":
 			if err := p.parseStringFlag(&p.config.OutputPrefix); err != nil {
@@ -600,6 +604,18 @@ func validateOutputFlags(config *Config) error {
 
 	if config.Quiet && config.Verbose {
 		return errors.New("--quiet and --verbose flags are mutually exclusive")
+	}
+
+	if config.StatsOnly && config.Stream {
+		return errors.New("--stats-only and --stream flags are mutually exclusive")
+	}
+
+	if config.StatsOnly && config.Verbose {
+		return errors.New("--stats-only and --verbose flags are mutually exclusive")
+	}
+
+	if config.StatsOnly && config.Quiet {
+		return errors.New("--stats-only and --quiet flags are mutually exclusive")
 	}
 
 	// Note: --stream and --verbose can be used together for detailed streaming

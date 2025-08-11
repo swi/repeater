@@ -581,3 +581,53 @@ func TestRunner_UnixPipelineOutput(t *testing.T) {
 		assert.Equal(t, 2, stats.SuccessfulExecutions)
 	})
 }
+
+func TestRunner_StatsOnlyMode(t *testing.T) {
+	t.Run("stats-only mode should suppress output and show statistics", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      3,
+			Command:    []string{"echo", "stats-only test"},
+			StatsOnly:  true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Verify executions completed
+		assert.Equal(t, 3, stats.TotalExecutions)
+		assert.Equal(t, 3, stats.SuccessfulExecutions)
+		assert.Equal(t, 0, stats.FailedExecutions)
+	})
+
+	t.Run("stats-only mode should work with command failures", func(t *testing.T) {
+		config := &cli.Config{
+			Subcommand: "count",
+			Times:      2,
+			Command:    []string{"false"},
+			StatsOnly:  true,
+		}
+
+		runner, err := NewRunner(config)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		stats, err := runner.Run(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stats)
+
+		// Should detect failures correctly
+		assert.Equal(t, 2, stats.TotalExecutions)
+		assert.Equal(t, 0, stats.SuccessfulExecutions)
+		assert.Equal(t, 2, stats.FailedExecutions)
+	})
+}
