@@ -9,6 +9,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -117,13 +118,13 @@ func (e *Executor) Execute(ctx context.Context, command []string) (*ExecutionRes
 	// Set up streaming if enabled and not in quiet mode
 	if e.streamWriter != nil && !e.quietMode {
 		// Create pipes for real-time streaming
-		stdoutPipe, err := cmd.StdoutPipe()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+		stdoutPipe, pipeErr := cmd.StdoutPipe()
+		if pipeErr != nil {
+			return nil, fmt.Errorf("failed to create stdout pipe: %w", pipeErr)
 		}
-		stderrPipe, err := cmd.StderrPipe()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+		stderrPipe, pipeErr := cmd.StderrPipe()
+		if pipeErr != nil {
+			return nil, fmt.Errorf("failed to create stderr pipe: %w", pipeErr)
 		}
 
 		// Start the command
@@ -132,11 +133,24 @@ func (e *Executor) Execute(ctx context.Context, command []string) (*ExecutionRes
 		}
 
 		// Stream output in real-time while capturing
-		e.streamOutput(stdoutPipe, &stdout, "stdout", command)
-		e.streamOutput(stderrPipe, &stderr, "stderr", command)
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			e.streamOutput(stdoutPipe, &stdout, "stdout", command)
+		}()
+
+		go func() {
+			defer wg.Done()
+			e.streamOutput(stderrPipe, &stderr, "stderr", command)
+		}()
 
 		// Wait for command to complete
 		err = cmd.Wait()
+
+		// Wait for streaming to complete
+		wg.Wait()
 	} else {
 		// Standard execution without streaming
 		cmd.Stdout = &stdout

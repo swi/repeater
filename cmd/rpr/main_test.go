@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -240,4 +241,57 @@ func TestLoadAdaptiveSubcommandIntegration(t *testing.T) {
 			assert.NoError(t, err, "load-adaptive subcommand should be handled by executeCommand")
 		})
 	}
+}
+func TestUnixExitCodes(t *testing.T) {
+	// Use the existing binary for testing
+	binaryPath := "../../rpr"
+	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		t.Skip("Binary ../../rpr not found - run 'go build -o rpr ./cmd/rpr' first")
+	}
+
+	t.Run("successful execution should return exit code 0", func(t *testing.T) {
+		cmd := exec.Command(binaryPath, "count", "--times", "2", "--", "echo", "success")
+		err := cmd.Run()
+
+		// Should succeed (exit code 0)
+		assert.NoError(t, err)
+	})
+
+	t.Run("command failures should return exit code 1", func(t *testing.T) {
+		cmd := exec.Command(binaryPath, "count", "--times", "2", "--", "false")
+		err := cmd.Run()
+
+		// Should fail with exit code 1 (some commands failed)
+		if exitError, ok := err.(*exec.ExitError); ok {
+			assert.Equal(t, 1, exitError.ExitCode())
+		} else {
+			t.Errorf("Expected exit error with code 1, got: %v", err)
+		}
+	})
+
+	t.Run("invalid arguments should return exit code 2", func(t *testing.T) {
+		cmd := exec.Command(binaryPath, "count", "--invalid-flag")
+		err := cmd.Run()
+
+		// Should fail with exit code 2 (usage error)
+		if exitError, ok := err.(*exec.ExitError); ok {
+			assert.Equal(t, 2, exitError.ExitCode())
+		} else {
+			t.Errorf("Expected exit error with code 2, got: %v", err)
+		}
+	})
+
+	t.Run("mixed success and failure should return exit code 1", func(t *testing.T) {
+		// This test uses a command that succeeds sometimes and fails sometimes
+		cmd := exec.Command(binaryPath, "count", "--times", "4", "--", "sh", "-c", "exit $((RANDOM % 2))")
+		err := cmd.Run()
+
+		// Should fail with exit code 1 (some commands failed)
+		if exitError, ok := err.(*exec.ExitError); ok {
+			assert.Equal(t, 1, exitError.ExitCode())
+		} else {
+			// It's possible all commands succeeded by chance, which is also valid
+			assert.NoError(t, err)
+		}
+	})
 }

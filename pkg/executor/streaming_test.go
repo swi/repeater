@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExecutor_StreamingOutput(t *testing.T) {
@@ -230,4 +233,60 @@ func TestExecutor_StreamingWithVerboseMode(t *testing.T) {
 	if !strings.Contains(streamedOutput, "echo") {
 		t.Errorf("Expected verbose output to include command name, got: %s", streamedOutput)
 	}
+}
+
+func TestExecutor_StreamingPreservesExitCodes(t *testing.T) {
+	t.Run("streaming should preserve non-zero exit codes", func(t *testing.T) {
+		var outputBuffer bytes.Buffer
+		executor, err := NewExecutor(WithStreaming(&outputBuffer))
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		result, err := executor.Execute(ctx, []string{"false"})
+
+		// Should not error (command executed successfully)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		// But should have non-zero exit code
+		assert.Equal(t, 1, result.ExitCode, "false command should return exit code 1")
+	})
+
+	t.Run("streaming should preserve zero exit codes", func(t *testing.T) {
+		var outputBuffer bytes.Buffer
+		executor, err := NewExecutor(WithStreaming(&outputBuffer))
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		result, err := executor.Execute(ctx, []string{"true"})
+
+		// Should not error and should have zero exit code
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, 0, result.ExitCode, "true command should return exit code 0")
+	})
+}
+
+func TestExecutor_StreamingVsNonStreaming(t *testing.T) {
+	t.Run("compare streaming vs non-streaming exit codes", func(t *testing.T) {
+		// Test non-streaming
+		executor1, err := NewExecutor()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		result1, err1 := executor1.Execute(ctx, []string{"false"})
+
+		// Test streaming
+		var outputBuffer bytes.Buffer
+		executor2, err := NewExecutor(WithStreaming(&outputBuffer))
+		require.NoError(t, err)
+
+		result2, err2 := executor2.Execute(ctx, []string{"false"})
+
+		// Both should have the same behavior
+		assert.Equal(t, err1, err2, "Both should return same error")
+		if result1 != nil && result2 != nil {
+			assert.Equal(t, result1.ExitCode, result2.ExitCode, "Both should have same exit code")
+		}
+	})
 }

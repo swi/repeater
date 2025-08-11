@@ -12,13 +12,23 @@ import (
 	"github.com/swi/repeater/pkg/runner"
 )
 
+// ExitError represents an error with a specific exit code
+type ExitError struct {
+	Code    int
+	Message string
+}
+
+func (e *ExitError) Error() string {
+	return e.Message
+}
+
 const version = "0.2.0"
 
 func main() {
 	config, err := cli.ParseArgs(os.Args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		os.Exit(2) // Usage error
 	}
 
 	// Handle special cases first
@@ -35,13 +45,19 @@ func main() {
 	// Validate configuration
 	if err := cli.ValidateConfig(config); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		os.Exit(2) // Usage error
 	}
 
 	// Execute using the integrated runner system
 	if err := executeCommand(config); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+
+		// Handle different exit codes
+		if exitErr, ok := err.(*ExitError); ok {
+			os.Exit(exitErr.Code)
+		} else {
+			os.Exit(1) // General error
+		}
 	}
 }
 
@@ -140,14 +156,23 @@ func executeCommand(config *cli.Config) error {
 
 	// Run the command
 	stats, err := r.Run(ctx)
-	if err != nil && ctx.Err() == nil {
-		// Error that's not from cancellation
-		return fmt.Errorf("execution failed: %w", err)
+	if err != nil {
+		if ctx.Err() == context.Canceled {
+			// Interrupted by signal (Ctrl+C)
+			return &ExitError{Code: 130, Message: "interrupted"}
+		}
+		// Other execution errors
+		return &ExitError{Code: 1, Message: fmt.Sprintf("execution failed: %v", err)}
 	}
 
 	// Unix pipeline behavior: only show results in verbose mode
 	if config.Verbose {
 		showExecutionResults(stats)
+	}
+
+	// Check if any commands failed
+	if stats != nil && stats.FailedExecutions > 0 {
+		return &ExitError{Code: 1, Message: "some commands failed"}
 	}
 
 	return nil
