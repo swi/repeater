@@ -29,6 +29,9 @@ A comprehensive guide to using the `rpr` command-line tool for continuous comman
   - [System Administration](#system-administration)
   - [Data Processing](#data-processing)
 - [Exit Codes for Scripting](#exit-codes-for-scripting)
+- [Integration Patterns](#integration-patterns)
+- [Performance Considerations](#performance-considerations)
+- [Troubleshooting](#troubleshooting)
 - [Tips & Best Practices](#tips--best-practices)
 
 ## Quick Start
@@ -516,6 +519,543 @@ rpr duration --for 1h --every 10s -- find /incoming -name "*.csv" -exec ./proces
 ```bash
 # Sync data every 15 minutes, up to 8 times (2 hours)
 rpr count --times 8 --every 15m -- rsync -av /local/data/ remote:/backup/data/
+```
+
+## Integration Patterns
+
+Repeater integrates seamlessly with existing Unix toolchains and modern infrastructure. Here are common integration patterns:
+
+### With Monitoring Systems
+
+**Prometheus metrics collection:**
+```bash
+# Collect metrics and format for Prometheus
+rpr interval --every 30s -- curl -s http://localhost:8080/metrics | \
+  grep -E '^(cpu_usage|memory_usage)' | \
+  awk '{print $1 " " $2 " " systime()}' >> /var/lib/prometheus/node_exporter/repeater.prom
+```
+
+**Grafana dashboard data:**
+```bash
+# Generate time-series data for Grafana
+rpr i -e 1m -- sh -c 'echo "$(date +%s),$(df / | tail -1 | awk "{print \$5}" | sed "s/%//")"; sleep 1' | \
+  tee -a /var/log/disk-usage.csv
+```
+
+**Nagios/Icinga integration:**
+```bash
+# Health check with Nagios-compatible exit codes
+rpr count --times 3 --quiet -- curl -f --max-time 10 https://api.example.com/health
+case $? in
+    0) echo "OK - API is healthy"; exit 0 ;;
+    1) echo "CRITICAL - API health check failed"; exit 2 ;;
+    *) echo "UNKNOWN - Unexpected error"; exit 3 ;;
+esac
+```
+
+### With CI/CD Pipelines
+
+**GitHub Actions integration:**
+```yaml
+# .github/workflows/health-check.yml
+- name: API Health Check
+  run: |
+    rpr count --times 5 --every 10s --quiet -- \
+      curl -f https://staging.example.com/health
+    if [ $? -ne 0 ]; then
+      echo "::error::Staging environment health check failed"
+      exit 1
+    fi
+```
+
+**Jenkins pipeline:**
+```groovy
+pipeline {
+    stages {
+        stage('Health Check') {
+            steps {
+                sh '''
+                    rpr interval --every 30s --times 10 --quiet -- \
+                      curl -f ${DEPLOYMENT_URL}/health
+                    if [ $? -ne 0 ]; then
+                        echo "Deployment health check failed"
+                        exit 1
+                    fi
+                '''
+            }
+        }
+    }
+}
+```
+
+**GitLab CI integration:**
+```yaml
+health_check:
+  script:
+    - rpr count --times 3 --every 5s --stats-only -- curl -f $API_URL/health
+    - echo "Health check completed with exit code $?"
+  only:
+    - deploy
+```
+
+### With Container Orchestration
+
+**Docker health checks:**
+```dockerfile
+# Dockerfile
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD rpr count --times 1 --quiet -- curl -f http://localhost:8080/health || exit 1
+```
+
+**Kubernetes liveness probe:**
+```yaml
+# k8s-deployment.yaml
+livenessProbe:
+  exec:
+    command:
+    - /bin/sh
+    - -c
+    - rpr count --times 1 --quiet -- curl -f http://localhost:8080/health
+  initialDelaySeconds: 30
+  periodSeconds: 30
+```
+
+**Docker Compose monitoring:**
+```yaml
+# docker-compose.yml
+services:
+  monitor:
+    image: alpine:latest
+    command: >
+      sh -c "apk add --no-cache curl &&
+             rpr interval --every 60s -- 
+               curl -f http://app:8080/health || 
+               docker-compose restart app"
+    depends_on:
+      - app
+```
+
+### With Log Aggregation
+
+**ELK Stack integration:**
+```bash
+# Send structured logs to Elasticsearch
+rpr interval --every 5m -- sh -c '
+  status=$(curl -s -w "%{http_code}" -o /dev/null https://api.example.com)
+  echo "{\"timestamp\":\"$(date -Iseconds)\",\"service\":\"api\",\"status\":$status}" | \
+  curl -X POST "http://elasticsearch:9200/health-checks/_doc" \
+       -H "Content-Type: application/json" -d @-
+'
+```
+
+**Fluentd log shipping:**
+```bash
+# Generate logs in fluentd-compatible format
+rpr i -e 30s -- sh -c '
+  response_time=$(curl -w "%{time_total}" -s -o /dev/null https://api.com)
+  echo "$(date -Iseconds) health.api response_time=$response_time"
+' | tee -a /var/log/fluentd/health.log
+```
+
+### With Parallel Processing
+
+**GNU Parallel integration:**
+```bash
+# Monitor multiple services in parallel
+echo "api.com db.com cache.com" | tr ' ' '\n' | \
+parallel -j3 'rpr count --times 5 --quiet -- curl -f https://{}/health && echo "{} OK" || echo "{} FAILED"'
+```
+
+**xargs parallel execution:**
+```bash
+# Process multiple URLs concurrently
+echo "url1 url2 url3" | xargs -n1 -P3 -I{} \
+  rpr count --times 1 --quiet -- curl -f {}
+```
+
+### With System Services
+
+**systemd service monitoring:**
+```ini
+# /etc/systemd/system/api-monitor.service
+[Unit]
+Description=API Health Monitor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/rpr interval --every 60s --quiet -- curl -f http://localhost:8080/health
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**cron integration:**
+```bash
+# /etc/crontab - Run health check every 5 minutes
+*/5 * * * * root rpr count --times 1 --quiet -- /usr/local/bin/health-check.sh || logger "Health check failed"
+```
+
+## Performance Considerations
+
+Understanding performance characteristics helps you choose the right scheduling mode and configuration for your use case.
+
+### Choosing Scheduling Modes
+
+#### **Interval Mode** - Best for regular monitoring
+```bash
+# Good for: Regular health checks, periodic data collection
+rpr interval --every 30s -- curl https://api.example.com/health
+
+# Performance: Predictable resource usage, consistent timing
+# Use when: You need regular, evenly-spaced execution
+```
+
+#### **Adaptive Mode** - Best for variable workloads
+```bash
+# Good for: API monitoring, services with variable response times
+rpr adaptive --base-interval 1s --show-metrics -- curl https://api.example.com
+
+# Performance: Automatically adjusts to system conditions
+# Use when: Command execution time varies significantly
+```
+
+#### **Load-Adaptive Mode** - Best for resource-aware execution
+```bash
+# Good for: CPU/memory intensive tasks, shared systems
+rpr load-adaptive --base-interval 30s --target-cpu 70 -- ./process-data.sh
+
+# Performance: Scales with available system resources
+# Use when: You want to avoid overwhelming the system
+```
+
+#### **Backoff Mode** - Best for unreliable services
+```bash
+# Good for: External APIs, flaky network services
+rpr backoff --initial 100ms --max 30s -- curl https://external-api.com
+
+# Performance: Reduces load on failing services
+# Use when: Dealing with unreliable external dependencies
+```
+
+### Resource Usage Guidelines
+
+#### **Memory Usage**
+```bash
+# Low memory usage (< 10MB)
+rpr interval --every 1s --quiet -- echo "test"
+
+# Moderate memory usage (10-50MB) 
+rpr interval --every 1s -- curl -s https://api.com | jq .
+
+# High memory usage (> 50MB)
+rpr interval --every 1s -- ./data-processing-script.sh
+```
+
+#### **CPU Usage**
+```bash
+# Minimal CPU impact
+rpr interval --every 10s --quiet -- curl -f https://api.com
+
+# Moderate CPU usage
+rpr adaptive --base-interval 1s -- curl https://api.com | jq . | awk '{print $1}'
+
+# CPU-intensive (use load-adaptive)
+rpr load-adaptive --base-interval 5s --target-cpu 60 -- ./cpu-intensive-task.sh
+```
+
+#### **Network Usage**
+```bash
+# Light network usage
+rpr interval --every 60s -- curl -I https://api.com
+
+# Heavy network usage (consider rate limiting)
+rpr rate-limit --rate 10/1m -- curl -s https://api.com/large-data
+
+# Burst network usage
+rpr count --times 100 --every 100ms -- curl -s https://api.com/small-endpoint
+```
+
+### Scaling Recommendations
+
+#### **Single Instance Limits**
+- **Maximum frequency**: ~100 executions/second (depends on command complexity)
+- **Recommended intervals**: ≥ 100ms for simple commands, ≥ 1s for complex commands
+- **Memory limit**: Scales with command output size and frequency
+
+#### **Multi-Instance Coordination**
+```bash
+# Use different intervals to avoid thundering herd
+# Instance 1:
+rpr interval --every 60s -- ./health-check.sh
+
+# Instance 2 (offset by 30s):
+sleep 30 && rpr interval --every 60s -- ./health-check.sh
+```
+
+#### **Horizontal Scaling Patterns**
+```bash
+# Distribute load across multiple hosts
+# Host 1: Monitor services 1-10
+rpr interval --every 30s -- ./monitor-services.sh 1 10
+
+# Host 2: Monitor services 11-20  
+rpr interval --every 30s -- ./monitor-services.sh 11 20
+```
+
+### Performance Tuning Tips
+
+#### **Optimize Command Execution**
+```bash
+# Slow: Multiple separate calls
+rpr interval --every 30s -- sh -c 'curl api1.com && curl api2.com && curl api3.com'
+
+# Fast: Single call with parallel processing
+rpr interval --every 30s -- sh -c 'curl api1.com & curl api2.com & curl api3.com & wait'
+```
+
+#### **Reduce Output Processing**
+```bash
+# Slow: Processing large output
+rpr interval --every 1s -- curl -s https://api.com/large-response | jq .
+
+# Fast: Filter at source
+rpr interval --every 1s -- curl -s https://api.com/large-response | jq -r '.status'
+```
+
+#### **Use Appropriate Output Modes**
+```bash
+# For automation: Use --quiet to reduce overhead
+rpr interval --every 100ms --quiet -- ./fast-check.sh
+
+# For debugging: Use --verbose only when needed
+rpr interval --every 5s --verbose -- ./debug-command.sh
+
+# For monitoring: Use --stats-only for metrics
+rpr interval --every 1m --stats-only -- ./performance-test.sh
+```
+
+## Troubleshooting
+
+Common issues and their solutions when using Repeater in production environments.
+
+### Common Issues
+
+#### **Pipeline Not Working**
+```bash
+# Problem: Command works manually but not in pipeline
+rpr count --times 3 -- echo "test" | wc -l
+# Returns: 1 (instead of 3)
+
+# Solution: Check command quoting and shell interpretation
+rpr count --times 3 -- sh -c 'echo "test"' | wc -l
+# Returns: 3 (correct)
+
+# Explanation: Without sh -c, each execution is a separate pipeline
+```
+
+#### **High CPU Usage**
+```bash
+# Problem: CPU usage is unexpectedly high
+rpr interval --every 100ms -- curl https://api.com
+
+# Solution 1: Increase interval
+rpr interval --every 1s -- curl https://api.com
+
+# Solution 2: Use load-adaptive mode
+rpr load-adaptive --base-interval 100ms --target-cpu 70 -- curl https://api.com
+
+# Solution 3: Use --quiet to reduce output processing
+rpr interval --every 100ms --quiet -- curl https://api.com
+```
+
+#### **Memory Issues**
+```bash
+# Problem: Memory usage grows over time
+rpr interval --every 1s -- ./script-with-memory-leak.sh
+
+# Solution 1: Use --quiet to reduce output buffering
+rpr interval --every 1s --quiet -- ./script-with-memory-leak.sh
+
+# Solution 2: Restart periodically using external wrapper
+while true; do
+    timeout 1h rpr interval --every 1s --quiet -- ./script.sh
+    sleep 5
+done
+```
+
+#### **Commands Not Executing**
+```bash
+# Problem: Commands appear to hang or not execute
+rpr interval --every 30s -- ./slow-script.sh
+
+# Solution 1: Check if command is actually slow
+time ./slow-script.sh
+
+# Solution 2: Add timeout to prevent hanging
+rpr interval --every 30s -- timeout 25s ./slow-script.sh
+
+# Solution 3: Use verbose mode to see what's happening
+rpr interval --every 30s --verbose -- ./slow-script.sh
+```
+
+### Debugging Tips
+
+#### **Test Commands Manually First**
+```bash
+# Always test your command manually before using with rpr
+./your-command.sh
+echo "Exit code: $?"
+
+# Then test with rpr
+rpr count --times 1 --verbose -- ./your-command.sh
+```
+
+#### **Use Verbose Mode for Debugging**
+```bash
+# See detailed execution information
+rpr count --times 3 --verbose -- curl https://api.example.com
+
+# Check timing and statistics
+rpr interval --every 5s --times 3 --verbose -- ./test-command.sh
+```
+
+#### **Check Exit Codes**
+```bash
+# Capture and examine exit codes
+rpr count --times 5 --quiet -- ./your-command.sh
+echo "Repeater exit code: $?"
+
+# Test individual command exit codes
+./your-command.sh
+echo "Command exit code: $?"
+```
+
+#### **Isolate Pipeline Issues**
+```bash
+# Test without pipeline first
+rpr count --times 3 -- echo "test"
+
+# Then add pipeline components one by one
+rpr count --times 3 -- echo "test" | cat
+rpr count --times 3 -- echo "test" | wc -l
+```
+
+### Error Scenarios and Solutions
+
+#### **Network Timeouts**
+```bash
+# Problem: Network requests timing out
+rpr interval --every 30s -- curl https://slow-api.com
+
+# Solution: Add explicit timeout and retry logic
+rpr interval --every 30s -- sh -c '
+    curl --max-time 10 --retry 2 --retry-delay 1 https://slow-api.com || 
+    echo "Request failed at $(date)"
+'
+```
+
+#### **Permission Issues**
+```bash
+# Problem: Permission denied errors
+rpr interval --every 1m -- ./script.sh
+# Error: Permission denied
+
+# Solution 1: Check script permissions
+chmod +x ./script.sh
+
+# Solution 2: Use absolute paths
+rpr interval --every 1m -- /full/path/to/script.sh
+
+# Solution 3: Run with appropriate user
+sudo -u appuser rpr interval --every 1m -- ./script.sh
+```
+
+#### **Environment Variable Issues**
+```bash
+# Problem: Environment variables not available
+rpr interval --every 1m -- echo $HOME
+# Output: (empty)
+
+# Solution: Use sh -c to preserve environment
+rpr interval --every 1m -- sh -c 'echo $HOME'
+
+# Or export variables explicitly
+export HOME=/home/user
+rpr interval --every 1m -- sh -c 'echo $HOME'
+```
+
+#### **Signal Handling Issues**
+```bash
+# Problem: Repeater not stopping cleanly
+rpr interval --every 1s -- ./long-running-command.sh
+# Ctrl+C doesn't stop immediately
+
+# Solution: Commands should handle signals properly
+rpr interval --every 1s -- timeout 30s ./long-running-command.sh
+
+# Or use shorter intervals
+rpr interval --every 5s -- ./quick-command.sh
+```
+
+### Performance Debugging
+
+#### **Identify Bottlenecks**
+```bash
+# Monitor system resources while running
+rpr interval --every 1s --verbose -- ./test-command.sh &
+top -p $!
+
+# Check I/O usage
+iotop -p $(pgrep rpr)
+
+# Monitor network usage
+nethogs
+```
+
+#### **Profile Command Execution**
+```bash
+# Time individual executions
+rpr count --times 10 --verbose -- time ./your-command.sh
+
+# Use stats-only mode to see execution patterns
+rpr interval --every 1s --times 60 --stats-only -- ./your-command.sh
+```
+
+#### **Memory Leak Detection**
+```bash
+# Monitor memory usage over time
+rpr interval --every 10s -- sh -c 'ps -o pid,vsz,rss,comm -p $(pgrep rpr)' &
+rpr interval --every 1s --times 1000 -- ./test-command.sh
+```
+
+### Getting Help
+
+#### **Enable Debug Output**
+```bash
+# Use verbose mode for detailed information
+rpr interval --every 5s --times 3 --verbose -- ./debug-me.sh
+
+# Check system logs
+journalctl -f | grep rpr
+```
+
+#### **Collect Diagnostic Information**
+```bash
+# System information
+uname -a
+rpr --version
+
+# Resource usage
+free -h
+df -h
+ps aux | grep rpr
+
+# Network connectivity (if applicable)
+ping -c 3 api.example.com
+curl -I https://api.example.com
 ```
 
 ## Tips & Best Practices
