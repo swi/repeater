@@ -5,6 +5,12 @@
 *.so
 *.dylib
 
+# Built binaries (project-specific)
+/rpr
+/rpr-*
+rpr-test
+rpr-optimized
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -20,6 +26,7 @@ go.work
 # Build directory
 /bin/
 /build/
+/dist/
 
 # IDE files
 .vscode/
@@ -40,17 +47,41 @@ Thumbs.db
 # Coverage reports
 coverage.out
 coverage.html
+coverage.txt
 
 # Temporary files
 *.tmp
 *.temp
+tmp.txt
+temp/
 
 # Log files
 *.log
+test_results.log
 
 # Configuration files (if they contain secrets)
 config.local.toml
 .env.local
+.env
 
 # TDD behavior plans (these are temporary)
 TDD_BEHAVIOR.md
+
+# Test artifacts and scripts (ad-hoc)
+simple_test.sh
+test-repeater-features.sh
+
+# Plugin development artifacts
+plugins/
+*.plugin
+
+# Benchmark results
+*.bench
+benchmark.txt
+
+# Profiling data
+*.prof
+*.pprof
+
+# Documentation generation artifacts
+docs/generated/
