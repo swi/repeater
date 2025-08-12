@@ -11,6 +11,8 @@ import (
 	"github.com/swi/repeater/pkg/adaptive"
 	"github.com/swi/repeater/pkg/cli"
 	"github.com/swi/repeater/pkg/executor"
+	"github.com/swi/repeater/pkg/health"
+	"github.com/swi/repeater/pkg/metrics"
 	"github.com/swi/repeater/pkg/ratelimit"
 	"github.com/swi/repeater/pkg/scheduler"
 )
@@ -39,7 +41,9 @@ type ExecutionRecord struct {
 
 // Runner orchestrates the execution of commands using schedulers and executors
 type Runner struct {
-	config *cli.Config
+	config        *cli.Config
+	healthServer  *health.HealthServer
+	metricsServer *metrics.MetricsServer
 }
 
 // NewRunner creates a new runner with the given configuration
@@ -82,12 +86,30 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 		if config.BaseInterval == 0 {
 			return nil, errors.New("load-adaptive requires --base-interval")
 		}
+	case "cron":
+		if config.CronExpression == "" {
+			return nil, errors.New("cron requires --cron")
+		}
 	default:
 		return nil, errors.New("unknown subcommand: " + config.Subcommand)
 	}
 
+	// Initialize health server if enabled
+	var healthServer *health.HealthServer
+	if config.HealthEnabled {
+		healthServer = health.NewHealthServer(config.HealthPort)
+	}
+
+	// Initialize metrics server if enabled
+	var metricsServer *metrics.MetricsServer
+	if config.MetricsEnabled {
+		metricsServer = metrics.NewMetricsServer(config.MetricsPort)
+	}
+
 	return &Runner{
-		config: config,
+		config:        config,
+		healthServer:  healthServer,
+		metricsServer: metricsServer,
 	}, nil
 }
 
@@ -97,6 +119,11 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 
 	// Create executor with streaming options from config
 	var executorOptions []executor.Option
+
+	// Add timeout if specified in config
+	if r.config.Timeout > 0 {
+		executorOptions = append(executorOptions, executor.WithTimeout(r.config.Timeout))
+	}
 
 	// Add streaming options based on config
 	if r.config.Stream {
@@ -123,6 +150,31 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 		return nil, fmt.Errorf("failed to create scheduler: %w", err)
 	}
 	defer sched.Stop()
+
+	// Start health server if enabled
+	if r.healthServer != nil {
+		go func() {
+			if err := r.healthServer.Start(ctx); err != nil {
+				// Log error but don't fail execution
+				if r.config.Verbose {
+					fmt.Fprintf(os.Stderr, "Health server error: %v\n", err)
+				}
+			}
+		}()
+		r.healthServer.SetReady(true)
+	}
+
+	// Start metrics server if enabled
+	if r.metricsServer != nil {
+		go func() {
+			if err := r.metricsServer.Start(ctx); err != nil {
+				// Log error but don't fail execution
+				if r.config.Verbose {
+					fmt.Fprintf(os.Stderr, "Metrics server error: %v\n", err)
+				}
+			}
+		}()
+	}
 
 	// Create execution context with stop conditions
 	execCtx, cancel := r.createExecutionContext(ctx)
@@ -199,9 +251,32 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 			stats.TotalExecutions++
 			executionNumber++
 
+			// Update health server stats if enabled
+			if r.healthServer != nil {
+				r.healthServer.SetExecutionStats(health.ExecutionStats{
+					TotalExecutions:      int64(stats.TotalExecutions),
+					SuccessfulExecutions: int64(stats.SuccessfulExecutions),
+					FailedExecutions:     int64(stats.FailedExecutions),
+					AverageResponseTime:  time.Duration(0), // TODO: Calculate if needed
+					LastExecution:        time.Now(),
+				})
+			}
+
+			// Update metrics server if enabled
+			if r.metricsServer != nil {
+				success := (execErr == nil && (result == nil || result.ExitCode == 0))
+				r.metricsServer.RecordExecution(success, record.Duration)
+			}
+
 			// Update adaptive scheduler if applicable
 			if adaptiveWrapper, ok := sched.(*AdaptiveSchedulerWrapper); ok {
 				adaptiveWrapper.UpdateFromExecution(record)
+
+				// Record scheduler interval in metrics if enabled
+				if r.metricsServer != nil {
+					metrics := adaptiveWrapper.GetMetrics()
+					r.metricsServer.RecordSchedulerInterval(metrics.CurrentInterval)
+				}
 
 				// Show metrics if requested
 				if r.config.ShowMetrics {
@@ -321,6 +396,8 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 		return r.createBackoffScheduler()
 	case "load-adaptive":
 		return r.createLoadAdaptiveScheduler()
+	case "cron":
+		return r.createCronScheduler()
 	default:
 		return nil, fmt.Errorf("unknown subcommand: %s", r.config.Subcommand)
 	}
@@ -559,4 +636,19 @@ func (r *Runner) createLoadAdaptiveScheduler() (Scheduler, error) {
 		r.config.MinInterval,
 		r.config.MaxInterval,
 	), nil
+}
+
+// createCronScheduler creates a cron-based scheduler
+func (r *Runner) createCronScheduler() (Scheduler, error) {
+	if r.config.CronExpression == "" {
+		return nil, fmt.Errorf("cron expression is required for cron subcommand")
+	}
+
+	// Create cron scheduler with timezone
+	cronScheduler, err := scheduler.NewCronScheduler(r.config.CronExpression, r.config.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cron scheduler: %w", err)
+	}
+
+	return cronScheduler, nil
 }

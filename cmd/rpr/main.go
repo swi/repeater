@@ -42,6 +42,14 @@ func main() {
 		return
 	}
 
+	// Apply configuration file settings if specified
+	if config.ConfigFile != "" {
+		if err := applyConfigFile(config); err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading config file: %v\n", err)
+			os.Exit(2) // Usage error
+		}
+	}
+
 	// Validate configuration
 	if err := cli.ValidateConfig(config); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -80,6 +88,7 @@ func showHelp() {
 	fmt.Println("  adaptive, adapt, a     Execute command with adaptive scheduling")
 	fmt.Println("  backoff, back, b       Execute command with exponential backoff")
 	fmt.Println("  load-adaptive, load, la Execute command with load-aware adaptive scheduling")
+	fmt.Println("  cron, cr               Execute command based on cron expressions")
 	fmt.Println()
 	fmt.Println("COMMON OPTIONS:")
 	fmt.Println("  --every, -e DURATION       Interval between executions")
@@ -97,6 +106,8 @@ func showHelp() {
 	fmt.Println("  --target-cpu FLOAT         Target CPU usage % for load-adaptive (default: 70)")
 	fmt.Println("  --target-memory FLOAT      Target memory usage % for load-adaptive (default: 80)")
 	fmt.Println("  --target-load FLOAT        Target load average for load-adaptive (default: 1.0)")
+	fmt.Println("  --cron EXPRESSION          Cron expression for scheduling (e.g., '0 9 * * *', '@daily')")
+	fmt.Println("  --timezone TZ              Timezone for cron scheduling (default: UTC)")
 	fmt.Println()
 	fmt.Println("OUTPUT CONTROL:")
 	fmt.Println("  --quiet, -q                Suppress command output, show only tool errors")
@@ -123,6 +134,8 @@ func showHelp() {
 	fmt.Println("  rpr adaptive --base-interval 1s --show-metrics -- curl api.com")
 	fmt.Println("  rpr backoff --initial 100ms --max 30s -- curl flaky-api.com")
 	fmt.Println("  rpr load-adaptive --base-interval 1s --target-cpu 70 -- ./task.sh")
+	fmt.Println("  rpr cron --cron '0 9 * * *' -- ./daily-backup.sh  # Every day at 9 AM")
+	fmt.Println("  rpr cron --cron '@hourly' --timezone America/New_York -- curl api.com")
 	fmt.Println()
 	fmt.Println("  # Output modes")
 	fmt.Println("  rpr i -e 5s -t 3 --quiet -- curl https://api.com  # Silent")

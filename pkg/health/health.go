@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -66,15 +67,25 @@ func (h *HealthServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/ready", h.readinessHandler)
 	mux.HandleFunc("/live", h.livenessHandler)
 
+	// Create listener to get actual port when using port 0
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", h.port))
+	if err != nil {
+		return fmt.Errorf("failed to create listener: %w", err)
+	}
+
+	// Update port with actual assigned port
+	h.mu.Lock()
+	h.port = listener.Addr().(*net.TCPAddr).Port
+	h.mu.Unlock()
+
 	h.server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", h.port),
 		Handler: mux,
 	}
 
 	// Start server in goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := h.server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}
 	}()
@@ -157,4 +168,11 @@ func (h *HealthServer) livenessHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+// GetPort returns the port the health server is configured to use
+func (h *HealthServer) GetPort() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.port
 }

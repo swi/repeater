@@ -44,12 +44,25 @@ type Config struct {
 	TargetMemory float64 // target memory usage percentage (0-100)
 	TargetLoad   float64 // target load average
 
+	// Cron scheduling fields
+	CronExpression string // cron expression for scheduling
+	Timezone       string // timezone for cron scheduling
+
 	// Output control fields
 	Stream       bool   // stream command output in real-time
 	Quiet        bool   // suppress all output
 	Verbose      bool   // show detailed execution information
 	StatsOnly    bool   // show only statistics, suppress command output
 	OutputPrefix string // prefix for output lines
+
+	// Config file fields (loaded from TOML)
+	Timeout        time.Duration // command execution timeout
+	MaxRetries     int           // maximum retry attempts
+	LogLevel       string        // logging level
+	MetricsEnabled bool          // enable metrics collection
+	MetricsPort    int           // metrics server port
+	HealthEnabled  bool          // enable health check endpoint
+	HealthPort     int           // health check server port
 }
 
 // ParseArgs parses command line arguments and returns a Config
@@ -182,6 +195,9 @@ func normalizeSubcommand(cmd string) string {
 	// Load-adaptive variations
 	case "load-adaptive", "load", "la":
 		return "load-adaptive"
+	// Cron variations
+	case "cron", "cr":
+		return "cron"
 	default:
 		return ""
 	}
@@ -290,6 +306,14 @@ func (p *argParser) parseSubcommandFlags() error {
 			p.pos++
 		case "--output-prefix", "-o":
 			if err := p.parseStringFlag(&p.config.OutputPrefix); err != nil {
+				return err
+			}
+		case "--cron":
+			if err := p.parseStringFlag(&p.config.CronExpression); err != nil {
+				return err
+			}
+		case "--timezone", "--tz":
+			if err := p.parseStringFlag(&p.config.Timezone); err != nil {
 				return err
 			}
 		default:
@@ -432,6 +456,14 @@ func ValidateConfig(config *Config) error {
 		// Validate load-adaptive configuration
 		if err := validateLoadAdaptiveConfig(config); err != nil {
 			return fmt.Errorf("invalid load-adaptive config: %w", err)
+		}
+	case "cron":
+		if config.CronExpression == "" {
+			return errors.New("--cron is required for cron subcommand")
+		}
+		// Validate cron configuration
+		if err := validateCronConfig(config); err != nil {
+			return fmt.Errorf("invalid cron config: %w", err)
 		}
 	}
 
@@ -619,6 +651,45 @@ func validateOutputFlags(config *Config) error {
 	}
 
 	// Note: --stream and --verbose can be used together for detailed streaming
+
+	return nil
+}
+
+// validateCronConfig validates the cron configuration
+func validateCronConfig(config *Config) error {
+	// Import cron package to validate expression
+	// For now, do basic validation to avoid circular imports
+	if config.CronExpression == "" {
+		return errors.New("cron expression cannot be empty")
+	}
+
+	// Set default timezone if not specified
+	if config.Timezone == "" {
+		config.Timezone = "UTC"
+	}
+
+	// Basic validation - check if it looks like a cron expression or shortcut
+	expr := strings.TrimSpace(config.CronExpression)
+	if strings.HasPrefix(expr, "@") {
+		// Shortcut format
+		validShortcuts := []string{"@yearly", "@annually", "@monthly", "@weekly", "@daily", "@hourly"}
+		valid := false
+		for _, shortcut := range validShortcuts {
+			if expr == shortcut {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("invalid cron shortcut: %s (valid shortcuts: %s)", expr, strings.Join(validShortcuts, ", "))
+		}
+	} else {
+		// Standard cron format - should have 5 fields
+		fields := strings.Fields(expr)
+		if len(fields) != 5 {
+			return fmt.Errorf("cron expression must have 5 fields (minute hour day month weekday), got %d", len(fields))
+		}
+	}
 
 	return nil
 }

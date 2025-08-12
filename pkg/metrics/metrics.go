@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -40,15 +41,25 @@ func (m *MetricsServer) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", m.metricsHandler)
 
+	// Create listener to get actual port when using port 0
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", m.port))
+	if err != nil {
+		return fmt.Errorf("failed to create listener: %w", err)
+	}
+
+	// Update port with actual assigned port
+	m.mu.Lock()
+	m.port = listener.Addr().(*net.TCPAddr).Port
+	m.mu.Unlock()
+
 	m.server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", m.port),
 		Handler: mux,
 	}
 
 	// Start server in goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		if err := m.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := m.server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}
 	}()
@@ -173,4 +184,11 @@ func (m *MetricsServer) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "# TYPE rpr_rate_limit_total counter\n")
 	_, _ = fmt.Fprintf(w, "rpr_rate_limit_total{result=\"hit\"} %d\n", m.rateLimitHits)
 	_, _ = fmt.Fprintf(w, "rpr_rate_limit_total{result=\"allowed\"} %d\n", m.rateLimitAllowed)
+}
+
+// GetPort returns the port the metrics server is configured to use
+func (m *MetricsServer) GetPort() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.port
 }
