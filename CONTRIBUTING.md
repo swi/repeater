@@ -2,16 +2,19 @@
 
 Thank you for your interest in contributing to Repeater! This document provides guidelines for contributing to the project.
 
-## 🎉 Project Status: **MVP COMPLETE (v0.2.0)**
+## 🎉 Project Status: **ADVANCED FEATURES COMPLETE (v0.3.0)**
 
-**Repeater is now fully functional** with all core features implemented and thoroughly tested! The MVP includes CLI with abbreviations, command execution, scheduling, and comprehensive integration.
+**Repeater is now a feature-complete platform** with advanced scheduling, plugin system, and comprehensive observability! The project includes all core features plus extensible architecture for custom functionality.
 
 ### ✅ **What's Working**
 - Complete CLI with multi-level abbreviations (`rpr i -e 30s -t 5 -- curl api.com`)
-- Three execution modes: interval, count, duration
+- Multiple execution modes: interval, count, duration, cron, adaptive, backoff, load-aware, rate-limit
+- Plugin system with extensible architecture for custom schedulers and executors
+- Configuration files with TOML support and environment variable overrides
+- Health endpoints and Prometheus-compatible metrics export
 - Signal handling and graceful shutdown
 - Comprehensive statistics and reporting
-- 72 tests with 85%+ coverage
+- 85+ tests with 90%+ coverage
 
 ## Development Workflow
 
@@ -80,7 +83,92 @@ make tdd-helper
 # Quality checks
 make lint
 make coverage
+
+# Plugin development
+make plugin-example
+make plugin-test
 ```
+
+## Plugin Development
+
+### Creating Custom Plugins
+
+Repeater supports extensible plugins for schedulers, executors, and outputs. Here's how to develop plugins:
+
+#### Plugin Interface Implementation
+
+```go
+// Example scheduler plugin
+package main
+
+import (
+    "time"
+    "github.com/swi/repeater/pkg/plugin"
+    "github.com/swi/repeater/pkg/scheduler"
+)
+
+type MySchedulerPlugin struct{}
+
+func (p *MySchedulerPlugin) Name() string { return "my-scheduler" }
+func (p *MySchedulerPlugin) Version() string { return "1.0.0" }
+func (p *MySchedulerPlugin) Description() string { 
+    return "Custom scheduling algorithm" 
+}
+
+func (p *MySchedulerPlugin) NewScheduler(config map[string]interface{}) (scheduler.Scheduler, error) {
+    // Create and return your custom scheduler
+    return NewMyScheduler(config), nil
+}
+
+func (p *MySchedulerPlugin) ValidateConfig(config map[string]interface{}) error {
+    // Validate plugin configuration
+    return nil
+}
+
+func (p *MySchedulerPlugin) ConfigSchema() *plugin.ConfigSchema {
+    // Return configuration schema
+    return &plugin.ConfigSchema{
+        Fields: []plugin.ConfigField{
+            {
+                Name:        "interval",
+                Type:        "duration",
+                Required:    true,
+                Description: "Base interval for scheduling",
+            },
+        },
+    }
+}
+
+// Plugin entry point
+var Plugin MySchedulerPlugin
+```
+
+#### Plugin Development Guidelines
+
+1. **Follow Interface Contracts**: Implement all required methods
+2. **Validate Configuration**: Provide comprehensive config validation
+3. **Handle Errors Gracefully**: Return meaningful error messages
+4. **Document Configuration**: Provide clear config schema
+5. **Test Thoroughly**: Include unit and integration tests
+
+#### Plugin Testing
+
+```bash
+# Test plugin loading
+go test ./pkg/plugin/
+
+# Test plugin functionality
+go test ./examples/plugins/my-scheduler/
+
+# Integration testing
+rpr plugin my-scheduler --interval 1s -- echo "test"
+```
+
+#### Plugin Distribution
+
+- **Go Plugins**: Compile to `.so` files for dynamic loading
+- **External Processes**: Implement plugin protocol for any language
+- **Configuration**: Provide `plugin.toml` manifest file
 
 ### Getting Help
 

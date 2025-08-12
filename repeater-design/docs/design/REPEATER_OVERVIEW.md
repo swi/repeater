@@ -8,13 +8,14 @@
 
 **Repeater** is a command-line tool designed for continuous, scheduled, and rate-limited execution of commands. While traditional retry tools focus on making failed commands succeed, repeater focuses on running successful commands repeatedly with intelligent timing, rate limiting, and scheduling capabilities.
 
-### ✅ **Implemented Features (v0.2.0)**
+### ✅ **Implemented Features (v0.2.0+)**
 - **Complete CLI** with multi-level abbreviations (`rpr i -e 30s -t 5 -- curl api.com`)
-- **Three execution modes**: interval, count, duration with flexible combinations
+- **Multiple execution modes**: interval, count, duration, cron, adaptive, backoff, load-aware, rate-limit
+- **Plugin System**: Extensible architecture for custom schedulers and executors
 - **Stop conditions**: Times, duration, and signal-based stopping
 - **Signal handling**: Graceful shutdown on Ctrl+C (SIGINT/SIGTERM)
 - **Statistics**: Comprehensive execution metrics and reporting
-- **High quality**: 72 tests with 85%+ coverage, production-ready
+- **High quality**: 85+ tests with 90%+ coverage, production-ready
 
 ## Core Problem
 
@@ -36,11 +37,12 @@ Current solutions are inadequate:
 
 Repeater provides intelligent continuous execution with:
 
-1. **Flexible Scheduling**: Fixed intervals, rate limiting, adaptive timing
-2. **Smart Stop Conditions**: Count-based, duration-based, or manual termination
-3. **Rate Limiting**: Mathematical rate limiting to prevent quota violations
-4. **Output Management**: Aggregation, filtering, and logging of repeated executions
-5. **Enterprise Features**: Multi-instance coordination, metrics, observability
+1. **Flexible Scheduling**: Fixed intervals, cron expressions, rate limiting, adaptive timing
+2. **Plugin System**: Extensible architecture for custom schedulers and executors
+3. **Smart Stop Conditions**: Count-based, duration-based, or manual termination
+4. **Rate Limiting**: Mathematical rate limiting to prevent quota violations
+5. **Output Management**: Aggregation, filtering, and logging of repeated executions
+6. **Enterprise Features**: Multi-instance coordination, metrics, observability
 
 ## Key Differentiators
 

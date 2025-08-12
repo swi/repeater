@@ -15,10 +15,12 @@ A comprehensive guide to using the `rpr` command-line tool for continuous comman
   - [Count-Based Execution](#count-based-execution)
   - [Duration-Based Execution](#duration-based-execution)
 - [Advanced Scheduling](#advanced-scheduling)
+  - [Cron-like Scheduling](#cron-like-scheduling)
   - [Rate-Limited Execution](#rate-limited-execution)
   - [Adaptive Scheduling](#adaptive-scheduling)
   - [Exponential Backoff](#exponential-backoff)
   - [Load-Aware Scheduling](#load-aware-scheduling)
+  - [Plugin-Based Scheduling](#plugin-based-scheduling)
 - [Advanced Usage](#advanced-usage)
   - [Combining Parameters](#combining-parameters)
   - [Working with Complex Commands](#working-with-complex-commands)
@@ -130,6 +132,7 @@ Repeater supports multiple levels of abbreviations for faster typing:
 | `interval` | `int` | `i` | `rpr i -e 30s -- curl api.com` |
 | `count` | `cnt` | `c` | `rpr c -t 5 -- echo hello` |
 | `duration` | `dur` | `d` | `rpr d -f 1m -- date` |
+| `cron` | `cr` | `cr` | `rpr cr --cron "0 9 * * *" -- ./backup.sh` |
 | `rate-limit` | `rate` | `rl` | `rpr rl -r 10/1h -- curl api.com` |
 | `adaptive` | `adapt` | `a` | `rpr a -b 1s -- curl api.com` |
 | `backoff` | `back` | `b` | `rpr b -i 100ms -- curl api.com` |
@@ -142,6 +145,8 @@ Repeater supports multiple levels of abbreviations for faster typing:
 | `--every DURATION` | `-e DURATION` | `-e 30s` |
 | `--times COUNT` | `-t COUNT` | `-t 10` |
 | `--for DURATION` | `-f DURATION` | `-f 2m` |
+| `--cron EXPRESSION` | `--cron` | `--cron "0 9 * * *"` |
+| `--timezone TZ` | `--tz TZ` | `--tz "America/New_York"` |
 
 ### Abbreviation Examples
 
@@ -281,6 +286,74 @@ rpr duration --for 5m --every 30s -- free -h
 
 ## Advanced Scheduling
 
+### Cron-like Scheduling
+
+Execute commands based on cron expressions with timezone support.
+
+#### Basic Syntax
+```bash
+rpr cron --cron <expression> [--timezone <tz>] -- <command>
+```
+
+#### Examples
+
+**Daily backup at 9 AM:**
+```bash
+rpr cron --cron "0 9 * * *" -- ./daily-backup.sh
+```
+*Use case: Automated daily maintenance tasks*
+
+**Weekday reports at 9 AM EST:**
+```bash
+rpr cron --cron "0 9 * * 1-5" --timezone "America/New_York" -- ./generate-report.sh
+```
+*Use case: Business day reporting with timezone awareness*
+
+**Every 15 minutes:**
+```bash
+rpr cron --cron "*/15 * * * *" -- curl -f https://api.example.com/health
+```
+*Use case: Regular health checks using cron syntax*
+
+**Using cron shortcuts:**
+```bash
+# Daily at midnight
+rpr cron --cron "@daily" -- ./cleanup.sh
+
+# Every hour
+rpr cron --cron "@hourly" -- ./log-rotation.sh
+
+# Weekly on Sunday at midnight
+rpr cron --cron "@weekly" -- ./weekly-backup.sh
+```
+
+#### Cron Expression Format
+```
+┌───────────── minute (0 - 59)
+│ ┌─────────── hour (0 - 23)
+│ │ ┌───────── day of month (1 - 31)
+│ │ │ ┌─────── month (1 - 12)
+│ │ │ │ ┌───── day of week (0 - 6) (Sunday to Saturday)
+│ │ │ │ │
+* * * * *
+```
+
+**Supported shortcuts:**
+- `@yearly` or `@annually` - Run once a year at midnight on January 1st
+- `@monthly` - Run once a month at midnight on the first day
+- `@weekly` - Run once a week at midnight on Sunday
+- `@daily` or `@midnight` - Run once a day at midnight
+- `@hourly` - Run once an hour at the beginning of the hour
+
+#### With Stop Conditions
+```bash
+# Run daily for a week
+rpr cron --cron "@daily" --times 7 -- ./daily-task.sh
+
+# Run hourly for 8 hours
+rpr cron --cron "@hourly" --for 8h -- ./hourly-check.sh
+```
+
 ### Rate-Limited Execution
 
 Execute commands with server-friendly rate limiting to avoid overwhelming APIs or services.
@@ -332,6 +405,63 @@ rpr adaptive --base-interval 1s --show-metrics -- curl https://api.example.com/h
 rpr adaptive --base-interval 30s --min-interval 10s --max-interval 5m -- mysql -e "SELECT 1"
 ```
 *Use case: Adaptive monitoring with safety bounds*
+
+### Plugin-Based Scheduling
+
+Use custom scheduling algorithms via the plugin system.
+
+#### Basic Syntax
+```bash
+rpr <plugin-name> [PLUGIN-OPTIONS] -- <command>
+```
+
+#### Examples
+
+**Fibonacci backoff scheduler:**
+```bash
+rpr fibonacci --base-interval 1s --max-interval 5m -- curl https://api.example.com
+```
+*Use case: Custom backoff pattern using Fibonacci sequence*
+
+**Machine learning adaptive scheduler:**
+```bash
+rpr ml-adaptive --learning-rate 0.1 --history-window 100 -- ./performance-test.sh
+```
+*Use case: AI-driven scheduling based on historical performance*
+
+**Chaos scheduler for testing:**
+```bash
+rpr chaos --min-interval 100ms --max-interval 10s --randomness 0.3 -- ./resilience-test.sh
+```
+*Use case: Introduce controlled randomness for chaos engineering*
+
+#### Plugin Management
+```bash
+# List available plugins
+rpr plugins list
+
+# Show plugin information
+rpr plugins info fibonacci
+
+# Install new plugins
+rpr plugins install fibonacci-scheduler
+
+# Update plugins
+rpr plugins update --all
+```
+
+#### Plugin Configuration
+```toml
+# ~/.repeater/config.toml
+[plugins.fibonacci]
+base_interval = "1s"
+max_interval = "5m"
+reset_threshold = 10
+
+[plugins.ml-adaptive]
+learning_rate = 0.1
+history_window = 100
+```
 
 **Load testing with failure threshold:**
 ```bash
@@ -1183,6 +1313,16 @@ rpr --version
 rpr interval --help
 rpr count --help
 rpr duration --help
+rpr cron --help
+rpr adaptive --help
+rpr backoff --help
+rpr load-adaptive --help
+rpr rate-limit --help
+
+# Show plugin help
+rpr plugins --help
+rpr plugins list
+rpr plugins info <plugin-name>
 ```
 
 For more examples and advanced usage patterns, see the project documentation at [github.com/swi/repeater](https://github.com/swi/repeater).

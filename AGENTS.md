@@ -13,7 +13,8 @@ This is a Go-based CLI tool for continuous command execution with intelligent sc
 
 ### 🚀 **Available Features**
 - **CLI with Abbreviations**: `rpr i -e 30s -t 5 -- curl api.com`
-- **Three Execution Modes**: interval, count, duration with flexible combinations
+- **Multiple Execution Modes**: interval, count, duration, cron, adaptive, backoff, load-aware, rate-limit
+- **Plugin System**: Extensible architecture for custom schedulers and executors
 - **Stop Conditions**: Times, duration, and signal-based stopping
 - **Statistics**: Comprehensive execution metrics and reporting
 - **Signal Handling**: Graceful shutdown on Ctrl+C
@@ -233,7 +234,8 @@ go test -bench=. ./...
 - Test for race conditions with `go test -race`
 
 ## Key Architecture Patterns
-- **Scheduler Interface**: Pluggable scheduling algorithms (interval, count, duration, rate-limited)
+- **Scheduler Interface**: Pluggable scheduling algorithms (interval, count, duration, cron, adaptive, backoff, load-aware, rate-limited)
+- **Plugin System**: Extensible architecture with interface-based plugins for schedulers, executors, and outputs
 - **Executor Pattern**: Command execution with timeout, output capture, and context support
 - **Configuration**: TOML files with environment variable overrides
 - **Daemon Integration**: Coordinate with patience daemon for multi-instance rate limiting
