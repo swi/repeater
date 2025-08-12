@@ -29,6 +29,16 @@ test:
 	@echo "🧪 Running unit tests..."
 	$(GOTEST) -v -race -cover ./pkg/...
 
+## Run cron tests
+test-cron:
+	@echo "🕐 Running cron tests..."
+	$(GOTEST) -v -race ./pkg/cron/...
+
+## Run plugin tests
+test-plugin:
+	@echo "🔌 Running plugin tests..."
+	$(GOTEST) -v -race ./pkg/plugin/...
+
 ## Run integration tests
 test-integration:
 	@echo "🔗 Running integration tests..."
@@ -45,7 +55,7 @@ benchmark:
 	$(GOTEST) -bench=. -benchmem ./pkg/...
 
 ## Run all quality checks
-quality-gate: lint test test-integration benchmark
+quality-gate: lint test test-cron test-plugin test-integration benchmark
 	@echo "✅ All quality checks passed"
 
 ## Run linting
@@ -131,6 +141,8 @@ help:
 	@echo ""
 	@echo "Test targets:"
 	@echo "  test           Run unit tests"
+	@echo "  test-cron      Run cron tests"
+	@echo "  test-plugin    Run plugin tests"
 	@echo "  test-integration  Run integration tests"
 	@echo "  test-e2e       Run end-to-end tests"
 	@echo "  benchmark      Run performance benchmarks"

@@ -4,7 +4,7 @@
 
 This document provides comprehensive real-world examples of using repeater (`rpr`) for various continuous execution scenarios with Unix pipeline integration. Examples are organized by use case and demonstrate both basic and advanced usage patterns.
 
-> **✅ Updated for v0.2.0 Unix Pipeline Ready** - All examples showcase the new pipeline-friendly behavior and output modes.
+> **✅ Updated for v0.3.0 Advanced Features Complete** - All examples showcase the complete feature set including cron scheduling, plugin system, and advanced schedulers.
 
 ## Output Mode Examples
 

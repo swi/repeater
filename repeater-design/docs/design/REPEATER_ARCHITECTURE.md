@@ -2,7 +2,7 @@
 
 ## System Overview
 
-Repeater is designed as a standalone Go application that can optionally integrate with shared infrastructure from the patience ecosystem. The architecture emphasizes modularity, testability, and performance for continuous execution scenarios.
+Repeater is designed as a comprehensive, extensible Go application with advanced scheduling capabilities, plugin system, and optional integration with shared infrastructure. The architecture emphasizes modularity, testability, performance, and extensibility for continuous execution scenarios.
 
 ## High-Level Architecture
 
