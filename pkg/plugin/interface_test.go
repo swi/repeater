@@ -169,8 +169,25 @@ func (m *MockSchedulerPlugin) Version() string {
 	return m.version
 }
 
+func (m *MockSchedulerPlugin) Description() string {
+	return "Mock scheduler plugin for testing"
+}
+
 func (m *MockSchedulerPlugin) ValidateConfig(config map[string]interface{}) error {
 	return nil
+}
+
+func (m *MockSchedulerPlugin) ConfigSchema() *ConfigSchema {
+	return &ConfigSchema{
+		Fields: []ConfigField{
+			{
+				Name:        "interval",
+				Type:        "duration",
+				Required:    true,
+				Description: "Base interval for scheduling",
+			},
+		},
+	}
 }
 
 func (m *MockSchedulerPlugin) Create(config map[string]interface{}) (Scheduler, error) {

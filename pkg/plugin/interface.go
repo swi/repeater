@@ -13,9 +13,16 @@ type Scheduler interface {
 
 // SchedulerPlugin interface defines the contract for scheduler plugins
 type SchedulerPlugin interface {
+	// Plugin metadata
 	Name() string
 	Version() string
+	Description() string
+
+	// Configuration management
 	ValidateConfig(config map[string]interface{}) error
+	ConfigSchema() *ConfigSchema
+
+	// Scheduler creation
 	Create(config map[string]interface{}) (Scheduler, error)
 }
 
@@ -52,4 +59,27 @@ type ExecutionResult struct {
 type OutputConfig struct {
 	Format string
 	Target string
+}
+
+// ConfigSchema represents the configuration schema for a plugin
+type ConfigSchema struct {
+	Fields []ConfigField `json:"fields"`
+}
+
+// ConfigField represents a single configuration field
+type ConfigField struct {
+	Name        string      `json:"name"`
+	Type        string      `json:"type"` // "string", "int", "duration", "bool"
+	Required    bool        `json:"required"`
+	Default     interface{} `json:"default,omitempty"`
+	Description string      `json:"description"`
+	Validation  *Validation `json:"validation,omitempty"`
+}
+
+// Validation represents validation rules for a configuration field
+type Validation struct {
+	Min   *float64 `json:"min,omitempty"`
+	Max   *float64 `json:"max,omitempty"`
+	Regex *string  `json:"regex,omitempty"`
+	OneOf []string `json:"one_of,omitempty"`
 }
