@@ -61,6 +61,13 @@ go build -o rpr ./cmd/rpr
 - **Real-time streaming**: Immediate output processing
 - **Exit code preservation**: Maintains command exit codes for scripting
 
+### 🎯 **Pattern Matching**
+- **Success patterns** (`--success-pattern`): Define regex patterns that indicate success regardless of exit code
+- **Failure patterns** (`--failure-pattern`): Define regex patterns that indicate failure regardless of exit code
+- **Case-insensitive matching** (`--case-insensitive`): Make pattern matching case-insensitive
+- **Pattern precedence**: Failure patterns override success patterns for comprehensive error detection
+- **Adaptive integration**: Pattern results feed into adaptive scheduling and metrics
+
 ## 📖 Usage Examples
 
 ### Unix Pipeline Integration
@@ -143,23 +150,45 @@ rpr c -t 100 -e 100ms -- curl -w "%{http_code}\n" -s https://api.com | sort | un
 rpr d -f 1h -e 5m -- free -h | awk 'NR==2{print $3}' | tee memory-usage.log
 ```
 
+### Pattern Matching Examples
+
+```bash
+# Monitor deployment success regardless of exit code
+rpr i -e 30s -t 10 --success-pattern "deployment successful" -- ./deploy.sh
+
+# Detect errors in output even with zero exit code
+rpr c -t 5 --failure-pattern "(?i)error|failed|timeout" -- ./health-check.sh
+
+# Case-insensitive pattern matching for log monitoring
+rpr d -f 1h -e 5m --failure-pattern "critical" --case-insensitive -- tail -n 1 /var/log/app.log
+
+# Combined patterns with precedence (failure overrides success)
+rpr i -e 1m -t 60 --success-pattern "ok" --failure-pattern "error" -- curl -s https://api.com/status
+
+# Adaptive scheduling with pattern-based success detection
+rpr adaptive --base-interval 1s --success-pattern "healthy" --show-metrics -- ./service-check.sh
+```
+
 ### Real-World Use Cases
 
 ```bash
 # Website uptime monitoring with logging
 rpr i -e 30s -f 24h -- curl -f -s -w "%{http_code}\n" https://mysite.com | tee uptime.log
 
-# Database health monitoring
-rpr c -t 10 -e 30s -- mysql -e "SELECT 1" | grep -c "1"
+# Database health monitoring with pattern matching
+rpr c -t 10 -e 30s --success-pattern "1" -- mysql -e "SELECT 1"
 
-# Log analysis during deployment
-rpr d -f 30m -e 5s -- tail -n 1 /var/log/app.log | grep -c "ERROR"
+# Log analysis during deployment with error detection
+rpr d -f 30m -e 5s --failure-pattern "(?i)error|exception|failed" -- tail -n 1 /var/log/app.log
 
 # SSL certificate monitoring
 rpr i -e 24h -t 7 -- openssl s_client -connect example.com:443 < /dev/null 2>&1 | grep -A2 "Verify return code"
 
 # Performance monitoring with statistics
 rpr i -e 1m -f 1h --stats-only -- curl -w "%{time_total}\n" -o /dev/null -s https://api.com
+
+# Application health monitoring with smart pattern detection
+rpr i -e 30s --success-pattern "status.*ok" --failure-pattern "(?i)down|error|timeout" -- curl -s https://api.com/health
 ```
 
 ## 🏗️ Architecture
@@ -191,6 +220,7 @@ rpr i -e 1m -f 1h --stats-only -- curl -w "%{time_total}\n" -o /dev/null -s http
 │   ├── errors/           # ✅ Categorized error handling
 │   ├── config/           # ✅ Configuration management (TOML support)
 │   ├── cron/             # ✅ Cron expression parsing and scheduling
+│   ├── patterns/         # ✅ Pattern matching for success/failure detection
 │   └── plugin/           # ✅ Plugin system for extensible schedulers
 ├── repeater-design/      # Design documentation
 ├── scripts/              # Development and TDD scripts
@@ -249,12 +279,13 @@ make test && make lint
 - ✅ **Plugin System**: Extensible architecture for custom schedulers and executors
 - ✅ **Complete CLI**: Full parsing with multi-level abbreviations (`i`, `c`, `d`, `cr`, `a`, `b`, `la`, `rl`)
 - ✅ **Output Control**: Default (pipeline-friendly), quiet, verbose, stats-only modes
+- ✅ **Pattern Matching**: Success/failure patterns with case-insensitive support and precedence rules
 - ✅ **Command Execution**: Context-aware with timeout, streaming, and error handling
 - ✅ **Signal Handling**: Graceful shutdown with Unix-standard exit codes (0, 1, 2, 130)
 - ✅ **Error Handling**: Circuit breakers, retry policies, categorized error management
 - ✅ **Monitoring**: Health endpoints, Prometheus metrics, execution statistics
 - ✅ **Configuration**: TOML support with environment variable overrides
-- ✅ **Comprehensive Testing**: 85+ tests with 90%+ coverage across all packages
+- ✅ **Comprehensive Testing**: 72+ tests with 85%+ coverage across all packages
 - ✅ **Complete Documentation**: README, USAGE guide, examples, troubleshooting
 
 #### **Production Validation:**

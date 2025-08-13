@@ -21,6 +21,11 @@ A comprehensive guide to using the `rpr` command-line tool for continuous comman
   - [Exponential Backoff](#exponential-backoff)
   - [Load-Aware Scheduling](#load-aware-scheduling)
   - [Plugin-Based Scheduling](#plugin-based-scheduling)
+- [Pattern Matching](#pattern-matching)
+  - [Success Patterns](#success-patterns)
+  - [Failure Patterns](#failure-patterns)
+  - [Case-Insensitive Matching](#case-insensitive-matching)
+  - [Pattern Precedence](#pattern-precedence)
 - [Advanced Usage](#advanced-usage)
   - [Combining Parameters](#combining-parameters)
   - [Working with Complex Commands](#working-with-complex-commands)
@@ -469,6 +474,147 @@ rpr adaptive --base-interval 500ms --failure-threshold 0.2 --times 100 -- curl h
 ```
 *Use case: Back off when failure rate exceeds 20%*
 
+## Pattern Matching
+
+Pattern matching allows you to define success and failure conditions based on command output rather than just exit codes. This is particularly useful for commands that don't follow standard Unix exit code conventions or when you need to detect specific conditions in the output.
+
+### Success Patterns
+
+Define regex patterns that indicate success regardless of the command's exit code.
+
+#### Basic Syntax
+```bash
+rpr <subcommand> --success-pattern <regex> -- <command>
+```
+
+#### Examples
+
+**Monitor deployment success:**
+```bash
+rpr interval --every 30s --times 10 --success-pattern "deployment successful" -- ./deploy.sh
+```
+*Use case: Treat deployment as successful when output contains "deployment successful", even if exit code is non-zero*
+
+**API health check with JSON response:**
+```bash
+rpr count --times 5 --success-pattern '"status":\s*"ok"' -- curl -s https://api.example.com/health
+```
+*Use case: Consider API healthy when JSON response contains `"status": "ok"`*
+
+**Database connection verification:**
+```bash
+rpr interval --every 1m --success-pattern "1" -- mysql -e "SELECT 1"
+```
+*Use case: Verify database connectivity by checking for "1" in output*
+
+### Failure Patterns
+
+Define regex patterns that indicate failure regardless of the command's exit code.
+
+#### Basic Syntax
+```bash
+rpr <subcommand> --failure-pattern <regex> -- <command>
+```
+
+#### Examples
+
+**Detect errors in application logs:**
+```bash
+rpr duration --for 1h --every 5m --failure-pattern "(?i)error|exception|failed" -- tail -n 10 /var/log/app.log
+```
+*Use case: Monitor logs for error conditions even when tail command succeeds*
+
+**API monitoring with error detection:**
+```bash
+rpr interval --every 30s --failure-pattern "(?i)timeout|unavailable|error" -- curl -s https://api.example.com/status
+```
+*Use case: Detect API issues from response content, not just HTTP status*
+
+**Service health monitoring:**
+```bash
+rpr count --times 10 --failure-pattern "down|inactive|failed" -- systemctl status nginx
+```
+*Use case: Detect service problems from status output*
+
+### Case-Insensitive Matching
+
+Make pattern matching case-insensitive for more flexible detection.
+
+#### Basic Syntax
+```bash
+rpr <subcommand> --case-insensitive --success-pattern <pattern> -- <command>
+# or
+rpr <subcommand> --failure-pattern "(?i)<pattern>" -- <command>
+```
+
+#### Examples
+
+**Case-insensitive success detection:**
+```bash
+rpr interval --every 1m --case-insensitive --success-pattern "healthy|ok|running" -- ./health-check.sh
+```
+*Use case: Match "HEALTHY", "Ok", "Running", etc.*
+
+**Case-insensitive error detection:**
+```bash
+rpr duration --for 30m --every 2m --case-insensitive --failure-pattern "error|warning|critical" -- ./system-check.sh
+```
+*Use case: Catch "ERROR", "Warning", "CRITICAL", etc.*
+
+### Pattern Precedence
+
+When both success and failure patterns are specified, failure patterns take precedence. This ensures that errors are always detected even when success patterns also match.
+
+#### Examples
+
+**Comprehensive monitoring with both patterns:**
+```bash
+rpr interval --every 30s --success-pattern "status.*ok" --failure-pattern "(?i)error|timeout|failed" -- curl -s https://api.example.com/health
+```
+*Use case: Consider successful when status is ok, but always fail on errors*
+
+**Log monitoring with precedence:**
+```bash
+rpr duration --for 1h --every 5m --success-pattern "completed" --failure-pattern "(?i)error|exception" -- tail -n 5 /var/log/process.log
+```
+*Use case: Success when process completes, but failure patterns override for errors*
+
+### Advanced Pattern Examples
+
+**Complex regex patterns:**
+```bash
+# Monitor HTTP status codes
+rpr count --times 10 --success-pattern "HTTP/1\.[01] [23][0-9][0-9]" -- curl -I https://api.example.com
+
+# Detect specific error codes
+rpr interval --every 1m --failure-pattern "HTTP/1\.[01] [45][0-9][0-9]" -- curl -I https://api.example.com
+
+# Monitor numeric thresholds
+rpr duration --for 10m --every 30s --failure-pattern "[89][0-9]|100" -- sh -c "df / | tail -1 | awk '{print \$5}' | sed 's/%//'"
+```
+
+**Integration with adaptive scheduling:**
+```bash
+# Adaptive scheduling with pattern-based success detection
+rpr adaptive --base-interval 1s --min-interval 500ms --max-interval 10s \
+    --success-pattern "healthy" --failure-pattern "(?i)error|down" \
+    --show-metrics -- ./service-check.sh
+```
+*Use case: Adaptive scheduling adjusts based on pattern matching results, not just exit codes*
+
+**Pattern matching with output control:**
+```bash
+# Quiet mode with pattern matching for automation
+rpr interval --every 30s --times 20 --quiet \
+    --success-pattern "backup completed" --failure-pattern "(?i)error|failed" \
+    -- ./backup-script.sh
+
+# Stats-only mode to see pattern matching effectiveness
+rpr count --times 50 --stats-only \
+    --success-pattern "ok" --failure-pattern "(?i)error|timeout" \
+    -- curl -s https://api.example.com/health
+```
+
 ### Exponential Backoff
 
 Implement exponential backoff for resilient execution against unreliable services.
@@ -575,12 +721,12 @@ rpr duration --for 1h --every 30s -- curl -w "%{http_code}\n" -s -o /dev/null ht
 rpr d -f 1h -e 30s -- curl -w "%{http_code}\n" -s -o /dev/null https://mysite.com | tee uptime.log
 ```
 
-**Database connection testing with success counting:**
+**Database connection testing with pattern matching:**
 ```bash
-# Test connection 10 times, count successful connections
-rpr count --times 10 --every 5s -- mysql -h db.example.com -u user -p -e "SELECT 1" | grep -c "1"
+# Test connection 10 times using pattern matching
+rpr count --times 10 --every 5s --success-pattern "1" -- mysql -h db.example.com -u user -p -e "SELECT 1"
 # Abbreviated form:
-rpr c -t 10 -e 5s -- mysql -h db.example.com -u user -p -e "SELECT 1" | grep -c "1"
+rpr c -t 10 -e 5s --success-pattern "1" -- mysql -h db.example.com -u user -p -e "SELECT 1"
 ```
 
 **SSL certificate expiration check:**
@@ -593,22 +739,22 @@ rpr i -e 24h -t 7 -- openssl s_client -connect example.com:443 -servername examp
 
 ### Development & Testing
 
-**API load testing:**
+**API load testing with success detection:**
 ```bash
-# Hit API endpoint 100 times as fast as possible
-rpr count --times 100 -- curl -s https://api.example.com/endpoint
+# Hit API endpoint 100 times, detect success from response
+rpr count --times 100 --success-pattern '"status":\s*"success"' -- curl -s https://api.example.com/endpoint
 ```
 
-**Build system monitoring:**
+**Build system monitoring with pattern matching:**
 ```bash
-# Check build status every 2 minutes during work hours
-rpr duration --for 8h --every 2m -- curl -s https://ci.example.com/api/build/status
+# Check build status every 2 minutes, detect failures
+rpr duration --for 8h --every 2m --success-pattern "passed|success" --failure-pattern "(?i)failed|error" -- curl -s https://ci.example.com/api/build/status
 ```
 
-**Database migration progress:**
+**Database migration progress with completion detection:**
 ```bash
-# Monitor migration every 10 seconds for up to 30 minutes
-rpr duration --for 30m --every 10s -- mysql -e "SELECT COUNT(*) FROM migration_status WHERE completed = 1"
+# Monitor migration with pattern-based completion detection
+rpr duration --for 30m --every 10s --success-pattern "migration completed" --failure-pattern "(?i)error|failed" -- ./check-migration-status.sh
 ```
 
 ### System Administration
