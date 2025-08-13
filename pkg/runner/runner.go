@@ -117,29 +117,23 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 	startTime := time.Now()
 
-	// Create executor with streaming options from config
-	var executorOptions []executor.Option
-
-	// Add timeout if specified in config
-	if r.config.Timeout > 0 {
-		executorOptions = append(executorOptions, executor.WithTimeout(r.config.Timeout))
+	// Create executor with configuration including pattern matching
+	executorConfig := executor.ExecutorConfig{
+		Timeout:       r.config.Timeout,
+		Streaming:     r.config.Stream,
+		StreamWriter:  os.Stdout,
+		QuietMode:     r.config.Quiet || r.config.StatsOnly,
+		VerboseMode:   r.config.Verbose,
+		OutputPrefix:  r.config.OutputPrefix,
+		PatternConfig: r.config.GetPatternConfig(),
 	}
 
-	// Add streaming options based on config
-	if r.config.Stream {
-		executorOptions = append(executorOptions, executor.WithStreaming(os.Stdout))
-	}
-	if r.config.Quiet || r.config.StatsOnly {
-		executorOptions = append(executorOptions, executor.WithQuietMode())
-	}
-	if r.config.Verbose {
-		executorOptions = append(executorOptions, executor.WithVerboseMode())
-	}
-	if r.config.OutputPrefix != "" {
-		executorOptions = append(executorOptions, executor.WithOutputPrefix(r.config.OutputPrefix))
+	// Set default timeout if not specified
+	if executorConfig.Timeout <= 0 {
+		executorConfig.Timeout = 30 * time.Second
 	}
 
-	exec, err := executor.NewExecutor(executorOptions...)
+	exec, err := executor.NewExecutorWithConfig(executorConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create executor: %w", err)
 	}
@@ -235,12 +229,13 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 				record.Stderr = execErr.Error()
 				stats.FailedExecutions++
 			} else {
-				// Command succeeded
+				// Command executed - use pattern matching result if available
 				record.ExitCode = result.ExitCode
 				record.Stdout = result.Stdout
 				record.Stderr = result.Stderr
 
-				if result.ExitCode == 0 {
+				// Use the Success field from ExecutionResult which includes pattern matching
+				if result.Success {
 					stats.SuccessfulExecutions++
 				} else {
 					stats.FailedExecutions++
@@ -264,13 +259,15 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 
 			// Update metrics server if enabled
 			if r.metricsServer != nil {
-				success := (execErr == nil && (result == nil || result.ExitCode == 0))
+				success := (execErr == nil && result != nil && result.Success)
 				r.metricsServer.RecordExecution(success, record.Duration)
 			}
 
 			// Update adaptive scheduler if applicable
 			if adaptiveWrapper, ok := sched.(*AdaptiveSchedulerWrapper); ok {
-				adaptiveWrapper.UpdateFromExecution(record)
+				// Determine success based on execution result
+				success := (execErr == nil && result != nil && result.Success)
+				adaptiveWrapper.UpdateFromExecution(record, success)
 
 				// Record scheduler interval in metrics if enabled
 				if r.metricsServer != nil {
@@ -542,17 +539,17 @@ func (w *AdaptiveSchedulerWrapper) Stop() {
 }
 
 // UpdateFromExecution updates the adaptive scheduler with execution results
-func (w *AdaptiveSchedulerWrapper) UpdateFromExecution(record ExecutionRecord) {
+func (w *AdaptiveSchedulerWrapper) UpdateFromExecution(record ExecutionRecord, success bool) {
 	result := adaptive.ExecutionResult{
 		Timestamp:    record.StartTime,
 		ResponseTime: record.Duration,
-		Success:      record.ExitCode == 0,
+		Success:      success, // Use pattern matching result
 		StatusCode:   record.ExitCode,
 		Error:        nil,
 	}
 
-	if record.ExitCode != 0 {
-		result.Error = fmt.Errorf("command failed with exit code %d", record.ExitCode)
+	if !success {
+		result.Error = fmt.Errorf("command failed (exit code %d)", record.ExitCode)
 	}
 
 	w.scheduler.UpdateFromResult(result)

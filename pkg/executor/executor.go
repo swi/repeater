@@ -12,6 +12,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/swi/repeater/pkg/patterns"
 )
 
 // ExecutionResult represents the result of a command execution
@@ -20,15 +22,30 @@ type ExecutionResult struct {
 	Stdout   string
 	Stderr   string
 	Duration time.Duration
+	Success  bool   // Whether the command was considered successful (after pattern matching)
+	Reason   string // Reason for the success/failure determination
+	Output   string // Combined stdout and stderr for convenience
+}
+
+// ExecutorConfig holds configuration for the executor
+type ExecutorConfig struct {
+	Timeout       time.Duration
+	Streaming     bool
+	StreamWriter  io.Writer
+	QuietMode     bool
+	VerboseMode   bool
+	OutputPrefix  string
+	PatternConfig *patterns.PatternConfig
 }
 
 // Executor handles command execution with configurable options
 type Executor struct {
-	timeout      time.Duration
-	streamWriter io.Writer
-	quietMode    bool
-	verboseMode  bool
-	outputPrefix string
+	timeout        time.Duration
+	streamWriter   io.Writer
+	quietMode      bool
+	verboseMode    bool
+	outputPrefix   string
+	patternMatcher *patterns.PatternMatcher
 }
 
 // Option represents a configuration option for the executor
@@ -87,6 +104,37 @@ func NewExecutor(options ...Option) (*Executor, error) {
 		if err := option(executor); err != nil {
 			return nil, err
 		}
+	}
+
+	return executor, nil
+}
+
+// NewExecutorWithConfig creates a new executor with the given configuration
+func NewExecutorWithConfig(config ExecutorConfig) (*Executor, error) {
+	executor := &Executor{
+		timeout:      config.Timeout,
+		quietMode:    config.QuietMode,
+		verboseMode:  config.VerboseMode,
+		outputPrefix: config.OutputPrefix,
+	}
+
+	// Set default timeout if not specified
+	if executor.timeout <= 0 {
+		executor.timeout = 30 * time.Second
+	}
+
+	// Set up streaming
+	if config.Streaming && config.StreamWriter != nil {
+		executor.streamWriter = config.StreamWriter
+	}
+
+	// Initialize pattern matcher if patterns are configured
+	if config.PatternConfig != nil {
+		matcher, err := patterns.NewPatternMatcher(*config.PatternConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create pattern matcher: %w", err)
+		}
+		executor.patternMatcher = matcher
 	}
 
 	return executor, nil
@@ -160,43 +208,56 @@ func (e *Executor) Execute(ctx context.Context, command []string) (*ExecutionRes
 
 	duration := time.Since(start)
 
-	// Create result with common fields
-	result := &ExecutionResult{
-		Stdout:   stdout.String(),
-		Stderr:   stderr.String(),
-		Duration: duration,
-	}
-
-	// Handle different types of errors
+	// Get original exit code
+	originalExitCode := 0
 	if err != nil {
-		return e.handleExecutionError(err, execCtx, result)
-	}
+		// Check if it's a context cancellation
+		if execCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("command timeout after %v", e.timeout)
+		}
+		if execCtx.Err() == context.Canceled {
+			return nil, fmt.Errorf("command execution canceled: %w", context.Canceled)
+		}
 
-	// Successful execution
-	result.ExitCode = 0
-	return result, nil
-}
-
-// handleExecutionError processes different types of execution errors
-func (e *Executor) handleExecutionError(err error, execCtx context.Context, result *ExecutionResult) (*ExecutionResult, error) {
-	// Check if it's a context cancellation
-	if execCtx.Err() == context.DeadlineExceeded {
-		return nil, fmt.Errorf("command timeout after %v", e.timeout)
-	}
-	if execCtx.Err() == context.Canceled {
-		return nil, fmt.Errorf("command execution canceled: %w", context.Canceled)
-	}
-
-	// Check if it's an exit error (non-zero exit code)
-	if exitError, ok := err.(*exec.ExitError); ok {
-		if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
-			result.ExitCode = status.ExitStatus()
-			return result, nil
+		// Check if it's an exit error (non-zero exit code)
+		if exitError, ok := err.(*exec.ExitError); ok {
+			if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
+				originalExitCode = status.ExitStatus()
+			}
+		} else {
+			// Other errors (command not found, etc.)
+			return nil, fmt.Errorf("command execution failed: %w", err)
 		}
 	}
 
-	// Other errors (command not found, etc.)
-	return nil, fmt.Errorf("command execution failed: %w", err)
+	// Combine stdout and stderr for pattern matching
+	combinedOutput := stdout.String() + stderr.String()
+
+	// Apply pattern matching if configured
+	var finalResult patterns.EvaluationResult
+	if e.patternMatcher != nil {
+		finalResult = e.patternMatcher.EvaluateResult(combinedOutput, originalExitCode)
+	} else {
+		// No pattern matching - use original exit code
+		finalResult = patterns.EvaluationResult{
+			Success:  originalExitCode == 0,
+			ExitCode: originalExitCode,
+			Reason:   "exit code used",
+		}
+	}
+
+	// Create result with all fields
+	result := &ExecutionResult{
+		ExitCode: finalResult.ExitCode,
+		Stdout:   stdout.String(),
+		Stderr:   stderr.String(),
+		Duration: duration,
+		Success:  finalResult.Success,
+		Reason:   finalResult.Reason,
+		Output:   combinedOutput,
+	}
+
+	return result, nil
 }
 
 // streamOutput handles real-time streaming of command output

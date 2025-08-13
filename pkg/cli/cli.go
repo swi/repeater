@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/swi/repeater/pkg/patterns"
 )
 
 // Config represents the parsed CLI configuration
@@ -55,6 +57,11 @@ type Config struct {
 	StatsOnly    bool   // show only statistics, suppress command output
 	OutputPrefix string // prefix for output lines
 
+	// Pattern matching fields
+	SuccessPattern  string // regex pattern indicating success in output
+	FailurePattern  string // regex pattern indicating failure in output
+	CaseInsensitive bool   // make pattern matching case-insensitive
+
 	// Config file fields (loaded from TOML)
 	Timeout        time.Duration // command execution timeout
 	MaxRetries     int           // maximum retry attempts
@@ -63,6 +70,19 @@ type Config struct {
 	MetricsPort    int           // metrics server port
 	HealthEnabled  bool          // enable health check endpoint
 	HealthPort     int           // health check server port
+}
+
+// GetPatternConfig returns a patterns.PatternConfig from the CLI config
+func (c *Config) GetPatternConfig() *patterns.PatternConfig {
+	if c.SuccessPattern == "" && c.FailurePattern == "" {
+		return nil
+	}
+
+	return &patterns.PatternConfig{
+		SuccessPattern:  c.SuccessPattern,
+		FailurePattern:  c.FailurePattern,
+		CaseInsensitive: c.CaseInsensitive,
+	}
 }
 
 // ParseArgs parses command line arguments and returns a Config
@@ -316,6 +336,17 @@ func (p *argParser) parseSubcommandFlags() error {
 			if err := p.parseStringFlag(&p.config.Timezone); err != nil {
 				return err
 			}
+		case "--success-pattern":
+			if err := p.parseStringFlag(&p.config.SuccessPattern); err != nil {
+				return err
+			}
+		case "--failure-pattern":
+			if err := p.parseStringFlag(&p.config.FailurePattern); err != nil {
+				return err
+			}
+		case "--case-insensitive":
+			p.config.CaseInsensitive = true
+			p.pos++
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -408,6 +439,11 @@ func ValidateConfig(config *Config) error {
 
 	// Validate output control flags
 	if err := validateOutputFlags(config); err != nil {
+		return err
+	}
+
+	// Validate pattern matching configuration
+	if err := validatePatterns(config); err != nil {
 		return err
 	}
 
@@ -688,6 +724,37 @@ func validateCronConfig(config *Config) error {
 		fields := strings.Fields(expr)
 		if len(fields) != 5 {
 			return fmt.Errorf("cron expression must have 5 fields (minute hour day month weekday), got %d", len(fields))
+		}
+	}
+
+	return nil
+}
+
+// validatePatterns validates regex patterns for success/failure matching
+func validatePatterns(config *Config) error {
+	// Validate success pattern if provided
+	if config.SuccessPattern != "" {
+		pattern := config.SuccessPattern
+		if config.CaseInsensitive {
+			pattern = "(?i)" + pattern
+		}
+		if _, err := patterns.NewPatternMatcher(patterns.PatternConfig{
+			SuccessPattern: pattern,
+		}); err != nil {
+			return fmt.Errorf("invalid success pattern: %w", err)
+		}
+	}
+
+	// Validate failure pattern if provided
+	if config.FailurePattern != "" {
+		pattern := config.FailurePattern
+		if config.CaseInsensitive {
+			pattern = "(?i)" + pattern
+		}
+		if _, err := patterns.NewPatternMatcher(patterns.PatternConfig{
+			FailurePattern: pattern,
+		}); err != nil {
+			return fmt.Errorf("invalid failure pattern: %w", err)
 		}
 	}
 
