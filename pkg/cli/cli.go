@@ -329,7 +329,7 @@ func (p *argParser) parseSubcommandFlags() error {
 		case "--show-metrics", "-m":
 			p.config.ShowMetrics = true
 			p.pos++
-		case "--initial", "-i":
+		case "--initial-delay", "-i":
 			if err := p.parseDurationFlag(&p.config.InitialInterval); err != nil {
 				return err
 			}
@@ -422,6 +422,10 @@ func (p *argParser) parseSubcommandFlags() error {
 			if err := p.parseStringSliceFlag(&p.config.HTTPCustomFields); err != nil {
 				return err
 			}
+		case "--attempts", "-a":
+			if err := p.parseIntFlag(&p.config.MaxRetries); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -481,6 +485,22 @@ func (p *argParser) parseFloatFlag(target *float64) error {
 	value, err := strconv.ParseFloat(p.args[p.pos+1], 64)
 	if err != nil {
 		return fmt.Errorf("invalid float value: %s", p.args[p.pos+1])
+	}
+
+	*target = value
+	p.pos += 2
+	return nil
+}
+
+// parseIntFlag parses an integer flag value
+func (p *argParser) parseIntFlag(target *int) error {
+	if p.pos+1 >= len(p.args) {
+		return fmt.Errorf("%s requires a value", p.args[p.pos])
+	}
+
+	value, err := strconv.Atoi(p.args[p.pos+1])
+	if err != nil {
+		return fmt.Errorf("invalid integer value: %s", p.args[p.pos+1])
 	}
 
 	*target = value
@@ -554,7 +574,7 @@ func ValidateConfig(config *Config) error {
 		}
 	case "backoff":
 		if config.InitialInterval == 0 {
-			return errors.New("--initial is required for backoff subcommand")
+			return errors.New("--initial-delay is required for backoff subcommand")
 		}
 		// Validate backoff configuration
 		if err := validateBackoffConfig(config); err != nil {

@@ -54,6 +54,7 @@ coverage.txt
 *.temp
 tmp.txt
 temp/
+tmp/
 
 # Log files
 *.log

@@ -239,10 +239,10 @@ Implement exponential backoff for resilient execution against unreliable service
 
 ```bash
 # Retry unreliable API with backoff
-rpr backoff --initial 100ms --max 30s --multiplier 2.0 -- curl https://flaky-api.com
+rpr backoff --initial-delay 100ms --max 30s --multiplier 2.0 -- curl https://flaky-api.com
 
 # Database connection with jitter
-rpr backoff --initial 1s --max 60s --jitter 0.1 --times 10 -- mysql -e "SELECT 1"
+rpr backoff --initial-delay 1s --max 60s --jitter 0.1 --times 10 -- mysql -e "SELECT 1"
 
 # Abbreviated
 rpr b -i 100ms --max 30s -- curl https://unreliable-service.com

@@ -140,7 +140,7 @@ func TestBackoffSubcommandIntegration(t *testing.T) {
 	}{
 		{
 			name: "backoff subcommand creates backoff scheduler",
-			args: []string{"backoff", "--initial", "100ms", "--max", "5s", "--times", "2", "--", "echo", "test"},
+			args: []string{"backoff", "--initial-delay", "100ms", "--max", "5s", "--times", "2", "--", "echo", "test"},
 			validate: func(t *testing.T, config *cli.Config) {
 				assert.Equal(t, "backoff", config.Subcommand)
 				assert.Equal(t, 100*time.Millisecond, config.InitialInterval)
@@ -151,7 +151,7 @@ func TestBackoffSubcommandIntegration(t *testing.T) {
 		},
 		{
 			name: "backoff with custom parameters",
-			args: []string{"backoff", "--initial", "200ms", "--max", "10s", "--multiplier", "1.5", "--jitter", "0.1", "--times", "1", "--", "echo", "backoff-test"},
+			args: []string{"backoff", "--initial-delay", "200ms", "--max", "10s", "--multiplier", "1.5", "--jitter", "0.1", "--times", "1", "--", "echo", "backoff-test"},
 			validate: func(t *testing.T, config *cli.Config) {
 				assert.Equal(t, "backoff", config.Subcommand)
 				assert.Equal(t, 200*time.Millisecond, config.InitialInterval)

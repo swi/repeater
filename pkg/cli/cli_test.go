@@ -727,7 +727,7 @@ func TestBackoffSubcommand(t *testing.T) {
 	}{
 		{
 			name: "backoff with basic parameters",
-			args: []string{"backoff", "--initial", "100ms", "--max", "10s", "--multiplier", "2.0", "--", "curl", "api.com"},
+			args: []string{"backoff", "--initial-delay", "100ms", "--max", "10s", "--multiplier", "2.0", "--", "curl", "api.com"},
 			expected: Config{
 				Subcommand:        "backoff",
 				InitialInterval:   100 * time.Millisecond,
@@ -740,7 +740,7 @@ func TestBackoffSubcommand(t *testing.T) {
 		},
 		{
 			name: "backoff with all parameters",
-			args: []string{"backoff", "--initial", "200ms", "--max", "30s", "--multiplier", "1.5", "--jitter", "0.1", "--", "echo", "test"},
+			args: []string{"backoff", "--initial-delay", "200ms", "--max", "30s", "--multiplier", "1.5", "--jitter", "0.1", "--", "echo", "test"},
 			expected: Config{
 				Subcommand:        "backoff",
 				InitialInterval:   200 * time.Millisecond,

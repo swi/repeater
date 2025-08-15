@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### CLI Enhancements
 - **New Subcommands**: `cron`/`cr`, `adaptive`/`a`, `backoff`/`b`, `load-adaptive`/`la`, `rate-limit`/`rl`
-- **Extended Flags**: `--cron`, `--timezone`/`--tz`, `--base-interval`, `--initial`, `--max`, `--rate`
+- **Extended Flags**: `--cron`, `--timezone`/`--tz`, `--base-interval`, `--initial-delay`, `--max`, `--rate`, `--attempts`
 - **HTTP-Aware Flags**: `--http-aware`, `--http-max-delay`, `--http-min-delay`, `--http-custom-fields`
 - **Parsing Control**: `--http-parse-json`, `--http-no-parse-json`, `--http-parse-headers`, `--http-trust-client`
 - **Plugin Support**: Dynamic plugin loading and management via CLI
