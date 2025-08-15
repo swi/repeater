@@ -1,47 +1,116 @@
-# Repeater (rpr) - Agent Development Guide
+# Repeater Development Guide - Agent Instructions
 
-## 🎉 Project Status: **MVP COMPLETE (v0.2.0)**
+## 🎉 Project Status: **PRODUCTION READY (v0.3.0)**
 
-This is a Go-based CLI tool for continuous command execution with intelligent scheduling and monitoring capabilities. **The MVP is now complete and fully functional** with all core features implemented and thoroughly tested.
+This is a Go-based CLI tool for continuous command execution with intelligent scheduling and monitoring capabilities. **The project is feature-complete and production-ready** with all core features implemented and thoroughly tested.
 
-### ✅ **Current Implementation Status**
-- **Phase 1 MVP**: **COMPLETED** ✅ (January 8, 2025)
-- **Core Functionality**: All subcommands working with real execution
-- **Test Coverage**: 72 comprehensive tests with 85%+ coverage
-- **Quality**: Production-ready with signal handling and graceful shutdown
-- **Documentation**: Complete user guides and examples
+## 📚 **CRITICAL: Documentation Standards (MANDATORY)**
 
-### 🚀 **Available Features**
-- **CLI with Abbreviations**: `rpr i -e 30s -t 5 -- curl api.com`
-- **Multiple Execution Modes**: interval, count, duration, cron, adaptive, backoff, load-aware, rate-limit
-- **Plugin System**: Extensible architecture for custom schedulers and executors
-- **Stop Conditions**: Times, duration, and signal-based stopping
-- **Statistics**: Comprehensive execution metrics and reporting
-- **Signal Handling**: Graceful shutdown on Ctrl+C
+**ALL AGENTS MUST FOLLOW THESE DOCUMENTATION RULES:**
 
-## Build/Test Commands
+### Core Documentation Structure
+
+The project uses a **streamlined 6-file documentation structure**. Never create additional markdown files or duplicate content.
+
+#### **Required Documentation Files**
+
+1. **README.md** - Project landing page (150-200 lines)
+   - Concise overview, key features, quick start, links to detailed docs
+   - **Update when**: Adding major features, changing core functionality
+
+2. **USAGE.md** - Comprehensive user guide (300-400 lines)
+   - Complete CLI reference, examples, configuration, troubleshooting
+   - **Update when**: Adding commands, flags, usage patterns
+
+3. **ARCHITECTURE.md** - Technical design
+   - System architecture, components, data flow, performance
+   - **Update when**: Changing architecture, adding components, refactoring
+
+4. **CONTRIBUTING.md** - Development guidelines
+   - TDD methodology, code standards, plugin development, documentation rules
+   - **Update when**: Changing development processes
+
+5. **FEATURES.md** - Roadmap and planning
+   - Implementation status, feature roadmap, priorities
+   - **Update when**: Completing features, changing roadmap
+
+6. **CHANGELOG.md** - Version history
+   - Detailed release notes, breaking changes, new features
+   - **Update when**: Making releases
+
+### **MANDATORY Documentation Update Rules**
+
+#### **When Adding New Features:**
+- [ ] **README.md**: Add feature to summary list
+- [ ] **USAGE.md**: Add comprehensive examples and usage patterns
+- [ ] **ARCHITECTURE.md**: Update if design changes
+- [ ] **FEATURES.md**: Mark feature as complete
+- [ ] **CHANGELOG.md**: Add entry with details
+
+#### **When Modifying CLI:**
+- [ ] **USAGE.md**: Update ALL affected command examples
+- [ ] **README.md**: Update quick start if needed
+- [ ] Test ALL examples for accuracy
+- [ ] Update help text and error messages
+
+#### **When Changing Architecture:**
+- [ ] **ARCHITECTURE.md**: Update design diagrams and descriptions
+- [ ] **CONTRIBUTING.md**: Update if development process changes
+- [ ] **README.md**: Update if core functionality changes
+
+#### **Documentation Quality Requirements:**
+1. **Accuracy**: All examples must be tested and functional
+2. **Completeness**: Cover all features and use cases
+3. **Consistency**: Use consistent terminology across files
+4. **No Duplication**: Never duplicate content between files
+5. **Version Consistency**: Keep version numbers synchronized
+
+#### **PROHIBITED Actions:**
+- ❌ **Creating new markdown files** (use existing 6-file structure)
+- ❌ **Duplicating content** across files
+- ❌ **Outdated examples** or references
+- ❌ **Conflicting information** between files
+- ❌ **Version inconsistencies** across documentation
+
+### **Documentation Enforcement Commands**
+
+```bash
+# MANDATORY: Run before any commit
+make docs-check           # Check consistency across all files
+make docs-test           # Test all code examples
+make docs-validate       # Validate links and references
+
+# Use during development
+make docs-lint           # Check formatting and style
+make docs-examples-test  # Test CLI examples specifically
+```
+
+## 🔧 **Build/Test Commands**
+
 ```bash
 # Build the binary
 go build -o rpr ./cmd/rpr
 
-# Run all tests
+# Development workflow
 make test                    # Unit tests
 make test-integration        # Integration tests  
 make test-e2e               # End-to-end tests
 make benchmark              # Performance tests
-make quality-gate           # All quality checks
+make quality-gate           # All quality checks (REQUIRED before commits)
 
-# Run single test
+# Testing specific areas
 go test -v ./pkg/scheduler/  # Test specific package
 go test -run TestSpecificFunction ./pkg/...  # Test specific function
 
-# Linting and formatting
+# Quality assurance
 make lint                   # Run golangci-lint
 go fmt ./...               # Format code
+make docs-check             # MANDATORY: Check documentation consistency
 ```
 
-## TDD Workflow (MANDATORY)
-**NEVER write implementation code without tests first. Follow this exact sequence:**
+## 🧪 **TDD Workflow (MANDATORY)**
+
+**NEVER write implementation code without tests first. This is strictly enforced.**
 
 ### Red-Green-Refactor Cycle
 1. **RED**: Write a failing test that describes the desired behavior
@@ -59,189 +128,158 @@ go fmt ./...               # Format code
 - **Micro-task**: 1 test case, 1 commit (15-30 min)
 - **Small task**: 2-3 related test cases, 1-2 commits (1-2 hours)
 - **Medium task**: Multiple behaviors, 3-5 commits (half day)
-- **Large task**: Break down further - never start without breakdown
 
-## LLM Commit Proposal Process
-**After completing any TDD phase, LLM must propose commit for user approval:**
+## 📝 **Commit Requirements**
 
-### Commit Proposal Format
+### LLM Commit Proposal Process
+**After completing any TDD phase, you MUST propose commits for user approval:**
+
 ```
 🔄 TDD Phase Complete - Commit Proposal
 =====================================
 
 📊 Changes Summary:
-- Files modified: [list]
+- Files modified: [list with documentation updates]
 - TDD Phase: [RED/GREEN/REFACTOR]
 - Tests status: [before] → [after]
 - Behavior: [specific behavior implemented]
+- Documentation updated: [YES/NO with list]
 
 📝 Proposed Commit:
 ```bash
-git add [files]
+git add [files including documentation]
 git commit -m "[type](phase): [description]
 
 - [specific change 1]
 - [specific change 2]
-- [TDD context and next steps]
+- [documentation updates]
 
 TDD-Phase: [RED/GREEN/REFACTOR]
 Behavior: [behavior-name]
 Tests-Added/Modified: [number]
-Coverage-Change: [before]% -> [after]%"
+Documentation-Updated: [files]"
 ```
 
 ❓ Approve this commit? (y/n/e/d)
 ```
 
-### User Approval Options
-- **y/yes**: Execute the proposed commit exactly as shown
-- **n/no**: Cancel commit, allow manual review/modification
-- **e/edit**: Modify the commit message before executing
-- **d/diff**: Show detailed changes before deciding
+### Git Commands for Documentation Restructuring
 
-## TDD Branching Strategy
-
-### Branch Types
-```
-main (production-ready, all tests pass)
-├── develop (integration branch, all TDD cycles complete)
-├── feature/scheduler-core (feature branch, multiple TDD cycles)
-│   ├── tdd/scheduler-creation (single behavior, 1-3 TDD cycles)
-│   ├── tdd/scheduler-timing (single behavior, 1-3 TDD cycles)
-│   └── tdd/scheduler-cleanup (single behavior, 1-3 TDD cycles)
-```
-
-### Branch Naming Convention
-- **Feature branches**: `feature/<component>-<capability>`
-- **TDD behavior branches**: `tdd/<specific-behavior>`
-- **Bug fix branches**: `fix/<issue-description>`
-
-### TDD Behavior Branch Workflow
 ```bash
-# Create behavior-specific branch
-git checkout feature/scheduler-core
-git checkout -b tdd/scheduler-creation
+# When restructuring documentation (like this cleanup)
+git add README.md USAGE.md ARCHITECTURE.md CONTRIBUTING.md FEATURES.md CHANGELOG.md
+git add .archive/docs-old/  # Include archived files
+git commit -m "docs: restructure documentation for clarity and eliminate duplication
 
-# Complete TDD cycles on behavior branch
-# RED → GREEN → REFACTOR (with LLM commit proposals)
+- Consolidate README.md to concise project overview (150 lines)
+- Expand USAGE.md with comprehensive examples and patterns
+- Create ARCHITECTURE.md from consolidated technical content
+- Update CONTRIBUTING.md with complete development guidelines
+- Add FEATURES.md roadmap and implementation status
+- Archive duplicate files: PROJECT_STRUCTURE.md, IMPLEMENTATION_PLANNING.md, 
+  ADVANCED_FEATURES_PLAN.md, examples/USAGE_EXAMPLES.md, project-status/
+- Eliminate 80%+ content duplication across 20 files → 6 focused files
+- Standardize version references to v0.3.0 throughout
+- Implement mandatory documentation sync requirements
 
-# Merge completed behavior back
-git checkout feature/scheduler-core
-git merge --no-ff tdd/scheduler-creation
-git branch -d tdd/scheduler-creation
+Documentation-Restructure: 20-files → 6-files
+Content-Duplication: Eliminated
+Version-Consistency: v0.3.0 standardized
+Enforcement-Rules: Added to AGENTS.md and CONTRIBUTING.md"
 ```
 
-## Git Hooks and Quality Automation
+## 🎯 **Available Features (v0.3.0)**
 
-### Pre-commit Hook (Quality Checks Only - No Auto-commits)
+### **CLI Commands**
+- **CLI with Abbreviations**: `rpr i -e 30s -t 5 -- curl api.com`
+- **8 Execution Modes**: interval, count, duration, cron, adaptive, backoff, load-aware, rate-limit
+- **Pattern Matching**: `--success-pattern`, `--failure-pattern`, `--case-insensitive`
+- **HTTP-Aware Intelligence**: `--http-aware`, `--http-max-delay`, `--http-custom-fields`
+- **Output Control**: `--quiet`, `--verbose`, `--stats-only`, `--stream`
+
+### **Production Features**
+- **Plugin System**: Extensible architecture for custom schedulers and executors
+- **Signal Handling**: Graceful shutdown on Ctrl+C
+- **Configuration**: TOML files with environment variable overrides
+- **Health Endpoints**: HTTP server for monitoring
+- **Metrics**: Prometheus-compatible metrics export
+- **Statistics**: Comprehensive execution metrics and reporting
+
+### **Quality Metrics**
+- **210+ Tests**: Comprehensive test coverage (90%+)
+- **Performance**: <1% timing deviation, minimal resource usage
+- **Race Testing**: Concurrent execution safety verified
+- **Integration Testing**: End-to-end workflow validation
+
+## 🏗️ **Key Architecture Patterns**
+
+- **Scheduler Interface**: Pluggable scheduling algorithms
+- **Plugin System**: Interface-based plugins for schedulers, executors, outputs
+- **Executor Pattern**: Command execution with timeout, output capture, context support
+- **Configuration**: TOML files with environment variable overrides
+- **Pattern Matching**: Regex-based success/failure detection with precedence
+- **HTTP-Aware**: Automatic API response parsing for optimal scheduling
+
+## 🚀 **Development Guidelines**
+
+### **Code Standards**
+- **Go Formatting**: `go fmt` and `goimports` (automated)
+- **Linting**: `golangci-lint` must pass
+- **Testing**: `go test -race ./...` must pass  
+- **Documentation**: All public APIs documented
+- **Coverage**: Minimum 90% test coverage
+
+### **Quality Gates (MANDATORY)**
 ```bash
-#!/bin/bash
-# .git/hooks/pre-commit
-echo "🔍 Running automated quality checks..."
+# MUST pass before any commit
+make quality-gate
 
-# Auto-format code (modify files, don't commit)
-go fmt ./...
-goimports -w .
-
-# Run linting
-if ! golangci-lint run; then
-    echo "❌ Linting failed - fix issues before committing"
-    exit 1
-fi
-
-# Run tests
-if ! go test ./...; then
-    echo "❌ Tests failing - fix before committing"
-    exit 1
-fi
-
-# Check TDD compliance
-if ! ./scripts/validate-tdd-cycle.sh; then
-    echo "❌ TDD cycle incomplete"
-    exit 1
-fi
-
-# If formatting changed files, require re-add
-if ! git diff --quiet; then
-    echo "✨ Code was auto-formatted - review and re-add files"
-    exit 1
-fi
-
-echo "✅ All quality checks passed - commit approved"
+# Individual checks
+make test              # All tests pass
+make lint              # Linting passes
+make docs-check        # Documentation consistency
+make benchmark         # Performance benchmarks
 ```
 
-## TDD Quality Gates
-
-### Coverage Requirements
-- Minimum 85% test coverage: `go test -cover ./...`
-- No untested public functions
-- All error paths must be tested
-
-### Test Quality Checks
-```bash
-# Verify tests fail without implementation
-go test -v ./pkg/... # Should show failures initially
-
-# Check coverage
-go test -cover ./... | grep -E "coverage: [0-9]+\.[0-9]+%" 
-
-# Race condition detection
-go test -race ./...
-
-# Benchmark performance
-go test -bench=. ./...
-```
-
-### TDD Anti-Patterns (FORBIDDEN)
+### **TDD Anti-Patterns (FORBIDDEN)**
 - ❌ Writing implementation before tests
 - ❌ Writing tests after implementation ("test-after")
 - ❌ Skipping the "failing test" step
-- ❌ Not running tests frequently during development
-- ❌ Ignoring test failures or making tests pass by changing assertions
+- ❌ Ignoring test failures
+- ❌ Making tests pass by changing assertions
+- ❌ Creating documentation without updating ALL affected files
 
-## Code Style Guidelines
+## 🔄 **Agent Workflow Summary**
 
-### Project Structure
-- Follow standard Go project layout: `cmd/`, `pkg/`, `internal/`, `tests/`
-- Use Test-Driven Development (TDD) - write tests before implementation
-- Maintain >85% test coverage for all packages
+### **For Any Code Changes:**
+1. **TDD First**: Write failing tests, then minimal implementation
+2. **Quality Gates**: Run `make quality-gate` before proposing commits
+3. **Documentation Sync**: Update ALL affected documentation files
+4. **Commit Proposals**: Always propose commits for user approval
+5. **Validation**: Ensure all examples work and documentation is consistent
 
-### Naming Conventions
-- Use Go standard naming: PascalCase for exported, camelCase for unexported
-- Interface names end with -er suffix (e.g., `Scheduler`, `Executor`)
-- Package names are lowercase, single word when possible
+### **For Documentation Changes:**
+1. **Update ALL affected files** according to documentation rules
+2. **Test ALL examples** for accuracy
+3. **Check consistency** across all 6 core files
+4. **Validate links** and references
+5. **Run documentation checks** before proposing commits
 
-### Error Handling
-- Return errors as the last return value
-- Use `fmt.Errorf()` for error wrapping with context
-- Handle all errors explicitly - no silent failures
-- Use custom error types for domain-specific errors
+### **For Feature Additions:**
+1. **Follow TDD methodology** strictly
+2. **Update README.md** with feature summary
+3. **Add comprehensive examples** to USAGE.md
+4. **Update ARCHITECTURE.md** if design changes
+5. **Mark complete** in FEATURES.md
+6. **Add changelog entry** with details
 
-### Imports
-- Group imports: standard library, third-party, local packages
-- Use goimports for automatic formatting
-- Avoid dot imports except in tests
+## 🚨 **Critical Reminders**
 
-### Types and Interfaces
-- Prefer small, focused interfaces
-- Use context.Context for cancellation and timeouts
-- Implement String() method for custom types used in logging
+- **NO NEW MARKDOWN FILES**: Use the 6-file structure only
+- **NO CONTENT DUPLICATION**: Each piece of information lives in exactly one place
+- **ALL EXAMPLES MUST WORK**: Test every code example before committing
+- **DOCUMENTATION IS MANDATORY**: Never code without updating docs
+- **TDD IS ENFORCED**: No implementation without tests first
+- **USER APPROVAL REQUIRED**: All commits must be approved before execution
 
-### Concurrency
-- Use channels for communication between goroutines
-- Always handle context cancellation in long-running operations
-- Protect shared state with mutexes or atomic operations
-- Test for race conditions with `go test -race`
-
-## Key Architecture Patterns
-- **Scheduler Interface**: Pluggable scheduling algorithms (interval, count, duration, cron, adaptive, backoff, load-aware, rate-limited)
-- **Plugin System**: Extensible architecture with interface-based plugins for schedulers, executors, and outputs
-- **Executor Pattern**: Command execution with timeout, output capture, and context support
-- **Configuration**: TOML files with environment variable overrides
-- **Daemon Integration**: Coordinate with patience daemon for multi-instance rate limiting
-
-## Manual Approval Safeguards
-- **No Auto-Commits**: LLM proposes, user approves, then LLM executes
-- **Quality Automation**: Formatting, linting, testing happen automatically
-- **Manual Control**: User always writes/approves commit messages
-- **Transparency**: User sees exact git commands before execution
+This development guide ensures consistent, high-quality contributions while maintaining the streamlined documentation structure and production-ready codebase.

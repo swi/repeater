@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cron Scheduling** with timezone support and standard cron expressions
 - **Plugin System** with extensible architecture for custom schedulers and executors
 - **Advanced Schedulers**: adaptive, backoff, load-aware, rate-limiting modes
+- **HTTP-Aware Intelligence** with automatic HTTP response parsing for optimal API scheduling
 - **Configuration Files** with TOML support and environment variable overrides
 - **Health Endpoints** with HTTP server for monitoring and observability
 - **Metrics Collection** with Prometheus-compatible metrics export
@@ -37,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security Features** with plugin validation and sandboxing capabilities
 - **CLI Integration** with plugin management commands and help system
 
+### Added - HTTP-Aware Intelligence
+- **HTTP Response Parsing** with automatic extraction of timing information from API responses
+- **Retry-After Header Support** respecting server-specified retry timing from HTTP headers
+- **JSON Response Parsing** extracting timing from `retry_after`, `retryAfter`, and rate limit fields
+- **Real-World API Support** with GitHub (403), AWS (429), Stripe, Discord API compatibility
+- **Priority-Based Parsing** with headers > custom JSON > standard JSON > nested structures
+- **Configuration Options** with parsing control, delay constraints, and custom field support
+- **Fallback Integration** seamlessly combining with any scheduler when no HTTP timing available
+- **CLI Integration** with `--http-aware`, `--http-max-delay`, `--http-custom-fields` flags
+
 ### Added - Advanced Schedulers
 - **Adaptive Scheduler** with AIMD algorithm and response time learning
 - **Exponential Backoff** with configurable multipliers, jitter, and max intervals
@@ -50,14 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Metrics Collection** with Prometheus-compatible metrics and statistics export
 
 ### Technical Implementation
-- **Enhanced Package Structure**: Added `cron`, `plugin`, `config`, `health`, `metrics` packages
-- **Comprehensive Testing**: 85+ tests with 90%+ coverage across all packages
+- **Enhanced Package Structure**: Added `cron`, `plugin`, `config`, `health`, `metrics`, `httpaware` packages
+- **Comprehensive Testing**: 210+ tests with 85%+ coverage across all packages
 - **Plugin Architecture**: Interface-based design supporting Go plugins and external processes
+- **HTTP-Aware Architecture**: Regex-based parsing with JSON support and priority-based timing extraction
 - **Advanced Error Handling**: Categorized errors, circuit breakers, and retry policies
 
 ### CLI Enhancements
 - **New Subcommands**: `cron`/`cr`, `adaptive`/`a`, `backoff`/`b`, `load-adaptive`/`la`, `rate-limit`/`rl`
 - **Extended Flags**: `--cron`, `--timezone`/`--tz`, `--base-interval`, `--initial`, `--max`, `--rate`
+- **HTTP-Aware Flags**: `--http-aware`, `--http-max-delay`, `--http-min-delay`, `--http-custom-fields`
+- **Parsing Control**: `--http-parse-json`, `--http-no-parse-json`, `--http-parse-headers`, `--http-trust-client`
 - **Plugin Support**: Dynamic plugin loading and management via CLI
 - **Enhanced Help**: Comprehensive documentation for all new features
 
