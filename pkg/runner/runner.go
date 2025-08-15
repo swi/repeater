@@ -12,6 +12,7 @@ import (
 	"github.com/swi/repeater/pkg/cli"
 	"github.com/swi/repeater/pkg/executor"
 	"github.com/swi/repeater/pkg/health"
+	"github.com/swi/repeater/pkg/httpaware"
 	"github.com/swi/repeater/pkg/metrics"
 	"github.com/swi/repeater/pkg/ratelimit"
 	"github.com/swi/repeater/pkg/scheduler"
@@ -41,9 +42,10 @@ type ExecutionRecord struct {
 
 // Runner orchestrates the execution of commands using schedulers and executors
 type Runner struct {
-	config        *cli.Config
-	healthServer  *health.HealthServer
-	metricsServer *metrics.MetricsServer
+	config             *cli.Config
+	healthServer       *health.HealthServer
+	metricsServer      *metrics.MetricsServer
+	httpAwareScheduler httpaware.HTTPAwareScheduler // HTTP-aware scheduler if enabled
 }
 
 // NewRunner creates a new runner with the given configuration
@@ -281,6 +283,29 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 				}
 			}
 
+			// Update HTTP-aware scheduler if enabled
+			if r.httpAwareScheduler != nil && result != nil {
+				// Pass the full command output (stdout + stderr) to HTTP-aware scheduler
+				fullOutput := result.Stdout
+				if result.Stderr != "" {
+					if fullOutput != "" {
+						fullOutput += "\n"
+					}
+					fullOutput += result.Stderr
+				}
+
+				// Set the last response for HTTP-aware analysis
+				r.httpAwareScheduler.SetLastResponse(fullOutput)
+
+				// Show HTTP timing info if verbose mode is enabled
+				if r.config.Verbose {
+					if timingInfo := r.httpAwareScheduler.GetTimingInfo(); timingInfo != nil {
+						fmt.Fprintf(os.Stderr, "HTTP-aware: Found %s timing: %v\n",
+							timingInfo.Source, timingInfo.Delay)
+					}
+				}
+			}
+
 			// Update tick time for scheduler
 			_ = tick
 		}
@@ -376,28 +401,54 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 	const noJitter = 0.0
 	const immediateStart = true
 
+	var baseScheduler Scheduler
+	var err error
+
 	switch r.config.Subcommand {
 	case "interval":
-		return scheduler.NewIntervalScheduler(r.config.Every, noJitter, immediateStart)
+		baseScheduler, err = scheduler.NewIntervalScheduler(r.config.Every, noJitter, immediateStart)
 	case "count", "duration":
 		interval := r.config.Every
 		if interval == 0 {
 			interval = immediateInterval // Immediate execution for count/duration without --every
 		}
-		return scheduler.NewIntervalScheduler(interval, noJitter, immediateStart)
+		baseScheduler, err = scheduler.NewIntervalScheduler(interval, noJitter, immediateStart)
 	case "rate-limit":
-		return r.createRateLimitScheduler()
+		baseScheduler, err = r.createRateLimitScheduler()
 	case "adaptive":
-		return r.createAdaptiveScheduler()
+		baseScheduler, err = r.createAdaptiveScheduler()
 	case "backoff":
-		return r.createBackoffScheduler()
+		baseScheduler, err = r.createBackoffScheduler()
 	case "load-adaptive":
-		return r.createLoadAdaptiveScheduler()
+		baseScheduler, err = r.createLoadAdaptiveScheduler()
 	case "cron":
-		return r.createCronScheduler()
+		baseScheduler, err = r.createCronScheduler()
 	default:
 		return nil, fmt.Errorf("unknown subcommand: %s", r.config.Subcommand)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap with HTTP-aware scheduler if enabled
+	return r.wrapWithHTTPAware(baseScheduler)
+}
+
+// wrapWithHTTPAware wraps a scheduler with HTTP-aware functionality if enabled
+func (r *Runner) wrapWithHTTPAware(baseScheduler Scheduler) (Scheduler, error) {
+	httpConfig := r.config.GetHTTPAwareConfig()
+	if httpConfig == nil {
+		return baseScheduler, nil
+	}
+
+	// Create HTTP-aware scheduler with the base scheduler as fallback
+	r.httpAwareScheduler = httpaware.NewHTTPAwareScheduler(*httpConfig)
+
+	// For now, we'll use the base scheduler for timing and integrate HTTP-aware logic
+	// in the execution loop. This allows us to maintain compatibility with existing
+	// scheduler interfaces while adding HTTP-aware intelligence.
+	return baseScheduler, nil
 }
 
 // createRateLimitScheduler creates a rate-limit aware scheduler

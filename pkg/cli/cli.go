@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/swi/repeater/pkg/httpaware"
 	"github.com/swi/repeater/pkg/patterns"
 )
 
@@ -62,6 +63,15 @@ type Config struct {
 	FailurePattern  string // regex pattern indicating failure in output
 	CaseInsensitive bool   // make pattern matching case-insensitive
 
+	// HTTP-aware scheduling fields
+	HTTPAware        bool          // enable HTTP-aware intelligent scheduling
+	HTTPMaxDelay     time.Duration // maximum delay cap for HTTP timing
+	HTTPMinDelay     time.Duration // minimum delay floor for HTTP timing
+	HTTPParseJSON    bool          // parse JSON response bodies for timing
+	HTTPParseHeaders bool          // parse HTTP headers for timing
+	HTTPTrustClient  bool          // trust 4xx client error timing
+	HTTPCustomFields []string      // custom JSON fields to check for timing
+
 	// Config file fields (loaded from TOML)
 	Timeout        time.Duration // command execution timeout
 	MaxRetries     int           // maximum retry attempts
@@ -85,13 +95,48 @@ func (c *Config) GetPatternConfig() *patterns.PatternConfig {
 	}
 }
 
+// GetHTTPAwareConfig returns HTTP-aware configuration from the CLI config
+func (c *Config) GetHTTPAwareConfig() *httpaware.HTTPAwareConfig {
+	if !c.HTTPAware {
+		return nil
+	}
+
+	// Set defaults
+	config := &httpaware.HTTPAwareConfig{
+		MaxDelay:          c.HTTPMaxDelay,
+		MinDelay:          c.HTTPMinDelay,
+		ParseJSON:         c.HTTPParseJSON,
+		ParseHeaders:      c.HTTPParseHeaders,
+		TrustClientErrors: c.HTTPTrustClient,
+		JSONFields:        c.HTTPCustomFields,
+	}
+
+	// Apply defaults if not set
+	if config.MaxDelay == 0 {
+		config.MaxDelay = 30 * time.Minute // Default max delay
+	}
+	if config.MinDelay == 0 {
+		config.MinDelay = 1 * time.Second // Default min delay
+	}
+	if config.JSONFields == nil {
+		config.JSONFields = []string{"retry_after", "retryAfter"} // Default fields
+	}
+
+	return config
+}
+
 // ParseArgs parses command line arguments and returns a Config
 func ParseArgs(args []string) (*Config, error) {
 	if len(args) == 0 {
 		return nil, errors.New("subcommand required")
 	}
 
-	parser := &argParser{args: args, config: &Config{}}
+	parser := &argParser{args: args, config: &Config{
+		// Set HTTP-aware defaults
+		HTTPParseJSON:    true,  // Enable JSON parsing by default
+		HTTPParseHeaders: true,  // Enable header parsing by default
+		HTTPTrustClient:  false, // Don't trust client errors by default
+	}}
 	return parser.parse()
 }
 
@@ -347,6 +392,36 @@ func (p *argParser) parseSubcommandFlags() error {
 		case "--case-insensitive":
 			p.config.CaseInsensitive = true
 			p.pos++
+		case "--http-aware":
+			p.config.HTTPAware = true
+			p.pos++
+		case "--http-max-delay":
+			if err := p.parseDurationFlag(&p.config.HTTPMaxDelay); err != nil {
+				return err
+			}
+		case "--http-min-delay":
+			if err := p.parseDurationFlag(&p.config.HTTPMinDelay); err != nil {
+				return err
+			}
+		case "--http-parse-json":
+			p.config.HTTPParseJSON = true
+			p.pos++
+		case "--http-no-parse-json":
+			p.config.HTTPParseJSON = false
+			p.pos++
+		case "--http-parse-headers":
+			p.config.HTTPParseHeaders = true
+			p.pos++
+		case "--http-no-parse-headers":
+			p.config.HTTPParseHeaders = false
+			p.pos++
+		case "--http-trust-client":
+			p.config.HTTPTrustClient = true
+			p.pos++
+		case "--http-custom-fields":
+			if err := p.parseStringSliceFlag(&p.config.HTTPCustomFields); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -758,5 +833,26 @@ func validatePatterns(config *Config) error {
 		}
 	}
 
+	return nil
+}
+
+// parseStringSliceFlag parses a comma-separated string slice flag value
+func (p *argParser) parseStringSliceFlag(target *[]string) error {
+	if p.pos+1 >= len(p.args) {
+		return fmt.Errorf("%s requires a value", p.args[p.pos])
+	}
+
+	value := p.args[p.pos+1]
+	if value == "" {
+		*target = []string{}
+	} else {
+		*target = strings.Split(value, ",")
+		// Trim whitespace from each field
+		for i, field := range *target {
+			(*target)[i] = strings.TrimSpace(field)
+		}
+	}
+
+	p.pos += 2
 	return nil
 }
