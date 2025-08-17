@@ -36,11 +36,18 @@ type Config struct {
 	FailureThreshold float64       // circuit breaker failure threshold
 	ShowMetrics      bool          // show adaptive metrics
 
-	// Exponential backoff fields
-	InitialInterval   time.Duration // initial backoff interval
-	BackoffMax        time.Duration // maximum backoff interval
-	BackoffMultiplier float64       // backoff multiplier
+	// Exponential backoff fields (legacy - for backward compatibility)
+	InitialInterval   time.Duration // initial backoff interval (deprecated: use BaseDelay)
+	BackoffMax        time.Duration // maximum backoff interval (deprecated: use MaxDelay)
+	BackoffMultiplier float64       // backoff multiplier (deprecated: use Multiplier)
 	BackoffJitter     float64       // jitter factor (0.0-1.0)
+
+	// New unified strategy fields
+	BaseDelay  time.Duration // base/initial delay for all strategies
+	Increment  time.Duration // linear increment (linear strategy)
+	Multiplier float64       // exponential/jitter multiplier
+	Exponent   float64       // polynomial exponent
+	MaxDelay   time.Duration // maximum delay cap for all strategies
 
 	// Load-aware adaptive fields
 	TargetCPU    float64 // target CPU usage percentage (0-100)
@@ -347,9 +354,11 @@ func (p *argParser) parseSubcommandFlags() error {
 				return err
 			}
 		case "--multiplier":
-			if err := p.parseFloatFlag(&p.config.BackoffMultiplier); err != nil {
+			if err := p.parseFloatFlag(&p.config.Multiplier); err != nil {
 				return err
 			}
+			// Also set legacy field for backward compatibility
+			p.config.BackoffMultiplier = p.config.Multiplier
 		case "--jitter":
 			if err := p.parseFloatFlag(&p.config.BackoffJitter); err != nil {
 				return err
@@ -435,6 +444,25 @@ func (p *argParser) parseSubcommandFlags() error {
 			if err := p.parseIntFlag(&p.config.MaxRetries); err != nil {
 				return err
 			}
+
+		// NEW STRATEGY PARAMETERS
+		case "--base-delay", "-bd":
+			if err := p.parseDurationFlag(&p.config.BaseDelay); err != nil {
+				return err
+			}
+		case "--increment", "-inc":
+			if err := p.parseDurationFlag(&p.config.Increment); err != nil {
+				return err
+			}
+		case "--exponent", "-exp":
+			if err := p.parseFloatFlag(&p.config.Exponent); err != nil {
+				return err
+			}
+		case "--max-delay", "-md":
+			if err := p.parseDurationFlag(&p.config.MaxDelay); err != nil {
+				return err
+			}
+		// Note: --multiplier already exists at line 356, update it to use new field
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
 		}

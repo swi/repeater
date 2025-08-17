@@ -16,6 +16,7 @@ import (
 	"github.com/swi/repeater/pkg/metrics"
 	"github.com/swi/repeater/pkg/ratelimit"
 	"github.com/swi/repeater/pkg/scheduler"
+	"github.com/swi/repeater/pkg/strategies"
 )
 
 // ExecutionStats represents statistics from a complete execution run
@@ -60,6 +61,19 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 
 	// Validate subcommand-specific requirements
 	switch config.Subcommand {
+	// RETRY STRATEGIES - require base-delay or fallback to 1s default
+	case "exponential":
+		// Will use base-delay or default to 1s if not specified
+	case "fibonacci":
+		// Will use base-delay or default to 1s if not specified
+	case "linear":
+		// Will use increment or default to 1s if not specified
+	case "polynomial":
+		// Will use base-delay and exponent or defaults if not specified
+	case "decorrelated-jitter":
+		// Will use base-delay and multiplier or defaults if not specified
+
+	// EXECUTION MODES - have specific requirements
 	case "interval":
 		if config.Every == 0 {
 			return nil, errors.New("interval requires --every")
@@ -72,25 +86,29 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 		if config.For == 0 {
 			return nil, errors.New("duration requires --for")
 		}
-	case "rate-limit":
-		if config.RateSpec == "" {
-			return nil, errors.New("rate-limit requires --rate")
+	case "cron":
+		if config.CronExpression == "" {
+			return nil, errors.New("cron requires --cron")
 		}
 	case "adaptive":
 		if config.BaseInterval == 0 {
 			return nil, errors.New("adaptive requires --base-interval")
 		}
-	case "backoff":
-		if config.InitialInterval == 0 {
-			return nil, errors.New("backoff requires --initial")
+
+	// RATE CONTROL
+	case "rate-limit":
+		if config.RateSpec == "" {
+			return nil, errors.New("rate-limit requires --rate")
 		}
 	case "load-adaptive":
 		if config.BaseInterval == 0 {
 			return nil, errors.New("load-adaptive requires --base-interval")
 		}
-	case "cron":
-		if config.CronExpression == "" {
-			return nil, errors.New("cron requires --cron")
+
+	// LEGACY SUPPORT
+	case "backoff":
+		if config.InitialInterval == 0 {
+			return nil, errors.New("backoff requires --initial-delay")
 		}
 	default:
 		return nil, errors.New("unknown subcommand: " + config.Subcommand)
@@ -405,6 +423,19 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 	var err error
 
 	switch r.config.Subcommand {
+	// NEW RETRY STRATEGIES
+	case "exponential":
+		baseScheduler, err = r.createStrategyScheduler("exponential")
+	case "fibonacci":
+		baseScheduler, err = r.createStrategyScheduler("fibonacci")
+	case "linear":
+		baseScheduler, err = r.createStrategyScheduler("linear")
+	case "polynomial":
+		baseScheduler, err = r.createStrategyScheduler("polynomial")
+	case "decorrelated-jitter":
+		baseScheduler, err = r.createStrategyScheduler("decorrelated-jitter")
+
+	// EXISTING EXECUTION MODES
 	case "interval":
 		baseScheduler, err = scheduler.NewIntervalScheduler(r.config.Every, noJitter, immediateStart)
 	case "count", "duration":
@@ -413,16 +444,20 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 			interval = immediateInterval // Immediate execution for count/duration without --every
 		}
 		baseScheduler, err = scheduler.NewIntervalScheduler(interval, noJitter, immediateStart)
-	case "rate-limit":
-		baseScheduler, err = r.createRateLimitScheduler()
-	case "adaptive":
-		baseScheduler, err = r.createAdaptiveScheduler()
-	case "backoff":
-		baseScheduler, err = r.createBackoffScheduler()
-	case "load-adaptive":
-		baseScheduler, err = r.createLoadAdaptiveScheduler()
 	case "cron":
 		baseScheduler, err = r.createCronScheduler()
+	case "adaptive":
+		baseScheduler, err = r.createAdaptiveScheduler()
+
+	// EXISTING RATE CONTROL
+	case "rate-limit":
+		baseScheduler, err = r.createRateLimitScheduler()
+	case "load-adaptive":
+		baseScheduler, err = r.createLoadAdaptiveScheduler()
+
+	// LEGACY SUPPORT
+	case "backoff":
+		baseScheduler, err = r.createBackoffScheduler()
 	default:
 		return nil, fmt.Errorf("unknown subcommand: %s", r.config.Subcommand)
 	}
@@ -699,4 +734,121 @@ func (r *Runner) createCronScheduler() (Scheduler, error) {
 	}
 
 	return cronScheduler, nil
+}
+
+// createStrategyScheduler creates a strategy-based scheduler using mathematical retry algorithms
+func (r *Runner) createStrategyScheduler(strategyName string) (Scheduler, error) {
+	// Create strategy configuration from CLI config
+	config := &strategies.StrategyConfig{
+		MaxAttempts:     r.config.MaxRetries,
+		Timeout:         r.config.Timeout,
+		SuccessPattern:  r.config.SuccessPattern,
+		FailurePattern:  r.config.FailurePattern,
+		CaseInsensitive: r.config.CaseInsensitive,
+	}
+
+	// Set default values if not specified
+	if config.MaxAttempts <= 0 {
+		config.MaxAttempts = 3 // Default retry attempts
+	}
+
+	// Create the specific strategy based on the strategy name
+	var strategy strategies.Strategy
+
+	switch strategyName {
+	case "exponential":
+		baseDelay := r.getBaseDelay()
+		multiplier := r.getMultiplier()
+		maxDelay := r.getMaxDelay()
+		config.BaseDelay = baseDelay
+		config.Multiplier = multiplier
+		config.MaxDelay = maxDelay
+		strategy = strategies.NewExponentialStrategy(baseDelay, multiplier, maxDelay)
+
+	case "fibonacci":
+		baseDelay := r.getBaseDelay()
+		maxDelay := r.getMaxDelay()
+		config.BaseDelay = baseDelay
+		config.MaxDelay = maxDelay
+		strategy = strategies.NewFibonacciStrategy(baseDelay, maxDelay)
+
+	case "linear":
+		increment := r.getIncrement()
+		maxDelay := r.getMaxDelay()
+		config.Increment = increment
+		config.MaxDelay = maxDelay
+		strategy = strategies.NewLinearStrategy(increment, maxDelay)
+
+	case "polynomial":
+		baseDelay := r.getBaseDelay()
+		exponent := r.getExponent()
+		maxDelay := r.getMaxDelay()
+		config.BaseDelay = baseDelay
+		config.Exponent = exponent
+		config.MaxDelay = maxDelay
+		strategy = strategies.NewPolynomialStrategy(baseDelay, exponent, maxDelay)
+
+	case "decorrelated-jitter":
+		baseDelay := r.getBaseDelay()
+		multiplier := r.getMultiplier()
+		maxDelay := r.getMaxDelay()
+		config.BaseDelay = baseDelay
+		config.Multiplier = multiplier
+		config.MaxDelay = maxDelay
+		strategy = strategies.NewDecorrelatedJitterStrategy(baseDelay, multiplier, maxDelay)
+
+	default:
+		return nil, fmt.Errorf("unknown strategy: %s", strategyName)
+	}
+
+	// Create and return the strategy scheduler
+	return scheduler.NewStrategyScheduler(strategy, config)
+}
+
+// Helper functions to get strategy parameters with defaults
+func (r *Runner) getBaseDelay() time.Duration {
+	if r.config.BaseDelay > 0 {
+		return r.config.BaseDelay
+	}
+	// Fallback to legacy field for backward compatibility
+	if r.config.InitialInterval > 0 {
+		return r.config.InitialInterval
+	}
+	return 1 * time.Second // Default
+}
+
+func (r *Runner) getIncrement() time.Duration {
+	if r.config.Increment > 0 {
+		return r.config.Increment
+	}
+	return 1 * time.Second // Default
+}
+
+func (r *Runner) getMultiplier() float64 {
+	if r.config.Multiplier > 0 {
+		return r.config.Multiplier
+	}
+	// Fallback to legacy field for backward compatibility
+	if r.config.BackoffMultiplier > 0 {
+		return r.config.BackoffMultiplier
+	}
+	return 2.0 // Default
+}
+
+func (r *Runner) getExponent() float64 {
+	if r.config.Exponent > 0 {
+		return r.config.Exponent
+	}
+	return 2.0 // Default
+}
+
+func (r *Runner) getMaxDelay() time.Duration {
+	if r.config.MaxDelay > 0 {
+		return r.config.MaxDelay
+	}
+	// Fallback to legacy field for backward compatibility
+	if r.config.BackoffMax > 0 {
+		return r.config.BackoffMax
+	}
+	return 60 * time.Second // Default
 }
