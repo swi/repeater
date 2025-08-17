@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/swi/repeater/pkg/cron"
@@ -20,6 +21,8 @@ type CronScheduler struct {
 	nextChan   chan time.Time
 	stopChan   chan struct{}
 	stopped    bool
+	mu         sync.RWMutex // Protects stopped field
+	stopOnce   sync.Once    // Ensures Stop() is idempotent
 }
 
 // NewCronScheduler creates a new cron scheduler
@@ -53,10 +56,12 @@ func (c *CronScheduler) Next() <-chan time.Time {
 
 // Stop stops the scheduler
 func (c *CronScheduler) Stop() {
-	if !c.stopped {
+	c.stopOnce.Do(func() {
+		c.mu.Lock()
 		c.stopped = true
+		c.mu.Unlock()
 		close(c.stopChan)
-	}
+	})
 }
 
 // schedule runs the scheduling logic in a goroutine

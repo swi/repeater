@@ -22,7 +22,7 @@ func (e *ExitError) Error() string {
 	return e.Message
 }
 
-const version = "0.2.0"
+const version = "0.4.0"
 
 func main() {
 	config, err := cli.ParseArgs(os.Args[1:])
@@ -80,35 +80,60 @@ func showHelp() {
 	fmt.Println("  --version, -v  Show version")
 	fmt.Println("  --config FILE  Load configuration from file")
 	fmt.Println()
-	fmt.Println("SUBCOMMANDS:")
+	fmt.Println("EXECUTION MODES:")
 	fmt.Println("  interval, int, i       Execute command at regular intervals")
 	fmt.Println("  count, cnt, c          Execute command a specific number of times")
 	fmt.Println("  duration, dur, d       Execute command for a specific duration")
-	fmt.Println("  rate-limit, rate, rl   Execute command with server-friendly rate limiting")
-	fmt.Println("  adaptive, adapt, a     Execute command with adaptive scheduling")
-	fmt.Println("  backoff, back, b       Execute command with exponential backoff")
-	fmt.Println("  load-adaptive, load, la Execute command with load-aware adaptive scheduling")
 	fmt.Println("  cron, cr               Execute command based on cron expressions")
 	fmt.Println()
-	fmt.Println("COMMON OPTIONS:")
+	fmt.Println("MATHEMATICAL RETRY STRATEGIES:")
+	fmt.Println("  exponential, exp       Exponential backoff (1s, 2s, 4s, 8s, 16s...)")
+	fmt.Println("  fibonacci, fib         Fibonacci backoff (1s, 1s, 2s, 3s, 5s, 8s...)")
+	fmt.Println("  linear, lin            Linear backoff (1s, 2s, 3s, 4s, 5s...)")
+	fmt.Println("  polynomial, poly       Polynomial backoff with custom exponent")
+	fmt.Println("  decorrelated-jitter, dj AWS-recommended distributed retry")
+	fmt.Println()
+	fmt.Println("ADAPTIVE SCHEDULING:")
+	fmt.Println("  adaptive, adapt, a     Execute command with adaptive scheduling")
+	fmt.Println("  load-adaptive, load, la Execute command with load-aware adaptive scheduling")
+	fmt.Println()
+	fmt.Println("RATE CONTROL:")
+	fmt.Println("  rate-limit, rate, rl   Execute command with server-friendly rate limiting")
+	fmt.Println()
+	fmt.Println("LEGACY (DEPRECATED):")
+	fmt.Println("  backoff, back, b       Execute command with exponential backoff (use 'exponential')")
+	fmt.Println()
+	fmt.Println("EXECUTION MODE OPTIONS:")
 	fmt.Println("  --every, -e DURATION       Interval between executions")
 	fmt.Println("  --times, -t COUNT          Number of times to execute")
 	fmt.Println("  --for, -f DURATION         Duration to keep running")
-	fmt.Println("  --rate, -r SPEC            Rate specification (e.g., 10/1h, 100/1m)")
-	fmt.Println("  --retry-pattern, -p SPEC   Retry pattern (e.g., 0,10m,30m)")
-	fmt.Println("  --show-next, -n            Show next allowed execution time")
+	fmt.Println("  --cron EXPRESSION          Cron expression for scheduling (e.g., '0 9 * * *', '@daily')")
+	fmt.Println("  --timezone TZ              Timezone for cron scheduling (default: UTC)")
+	fmt.Println()
+	fmt.Println("RETRY STRATEGY OPTIONS:")
+	fmt.Println("  --base-delay DURATION      Base delay for mathematical strategies (default: 1s)")
+	fmt.Println("  --increment DURATION       Linear increment for linear strategy (default: 1s)")
+	fmt.Println("  --exponent FLOAT           Polynomial exponent (default: 2.0)")
+	fmt.Println("  --multiplier FLOAT         Growth multiplier for exponential/jitter (default: 2.0)")
+	fmt.Println("  --max-delay DURATION       Maximum delay cap for all strategies (default: 60s)")
+	fmt.Println("  --attempts, -a COUNT       Maximum retry attempts (default: 3)")
+	fmt.Println()
+	fmt.Println("ADAPTIVE SCHEDULING OPTIONS:")
 	fmt.Println("  --base-interval, -b DUR    Base interval for adaptive scheduling")
 	fmt.Println("  --show-metrics, -m         Show adaptive scheduling metrics")
-	fmt.Println("  --initial-delay, -i DUR    Initial interval for exponential backoff")
-	fmt.Println("  --attempts, -a COUNT       Maximum retry attempts")
-	fmt.Println("  --max, -x DUR              Maximum backoff interval")
-	fmt.Println("  --multiplier FLOAT         Backoff multiplier (default: 2.0)")
-	fmt.Println("  --jitter FLOAT             Jitter factor 0.0-1.0 (default: 0.0)")
 	fmt.Println("  --target-cpu FLOAT         Target CPU usage % for load-adaptive (default: 70)")
 	fmt.Println("  --target-memory FLOAT      Target memory usage % for load-adaptive (default: 80)")
 	fmt.Println("  --target-load FLOAT        Target load average for load-adaptive (default: 1.0)")
-	fmt.Println("  --cron EXPRESSION          Cron expression for scheduling (e.g., '0 9 * * *', '@daily')")
-	fmt.Println("  --timezone TZ              Timezone for cron scheduling (default: UTC)")
+	fmt.Println()
+	fmt.Println("RATE CONTROL OPTIONS:")
+	fmt.Println("  --rate, -r SPEC            Rate specification (e.g., 10/1h, 100/1m)")
+	fmt.Println("  --retry-pattern, -p SPEC   Retry pattern (e.g., 0,10m,30m)")
+	fmt.Println("  --show-next, -n            Show next allowed execution time")
+	fmt.Println()
+	fmt.Println("LEGACY OPTIONS (DEPRECATED):")
+	fmt.Println("  --initial-delay, -i DUR    Initial interval for backoff (use --base-delay)")
+	fmt.Println("  --max, -x DUR              Maximum backoff interval (use --max-delay)")
+	fmt.Println("  --jitter FLOAT             Jitter factor 0.0-1.0 (default: 0.0)")
 	fmt.Println()
 	fmt.Println("OUTPUT CONTROL:")
 	fmt.Println("  --quiet, -q                Suppress command output, show only tool errors")
@@ -130,10 +155,16 @@ func showHelp() {
 	fmt.Println("  rpr c -t 20 -- curl -w \"%{time_total}\\n\" -s -o /dev/null api.com | sort -n")
 	fmt.Println("  rpr d -f 1h -e 5m -- df -h / | awk 'NR==2{print $5}' | tee disk.log")
 	fmt.Println()
+	fmt.Println("  # Mathematical retry strategies")
+	fmt.Println("  rpr exponential --base-delay 1s --attempts 5 -- curl flaky-api.com")
+	fmt.Println("  rpr exp --base-delay 500ms --max-delay 30s --attempts 3 -- ping google.com")
+	fmt.Println("  rpr fibonacci --base-delay 1s --attempts 8 -- curl api.com")
+	fmt.Println("  rpr linear --increment 2s --attempts 5 -- ./retry-script.sh")
+	fmt.Println("  rpr polynomial --base-delay 1s --exponent 1.5 --attempts 4 -- command")
+	fmt.Println()
 	fmt.Println("  # Advanced scheduling")
 	fmt.Println("  rpr rate-limit --rate 100/1h -- curl https://api.github.com/user")
 	fmt.Println("  rpr adaptive --base-interval 1s --show-metrics -- curl api.com")
-	fmt.Println("  rpr backoff --initial-delay 100ms --max 30s -- curl flaky-api.com")
 	fmt.Println("  rpr load-adaptive --base-interval 1s --target-cpu 70 -- ./task.sh")
 	fmt.Println("  rpr cron --cron '0 9 * * *' -- ./daily-backup.sh  # Every day at 9 AM")
 	fmt.Println("  rpr cron --cron '@hourly' --timezone America/New_York -- curl api.com")
@@ -241,6 +272,7 @@ func showExecutionInfo(config *cli.Config) {
 			fmt.Printf(", with metrics")
 		}
 	case "backoff":
+		fmt.Fprintf(os.Stderr, "⚠️  Warning: 'backoff' is deprecated, use 'exponential' instead\n")
 		fmt.Printf("📈 Exponential backoff: initial %v", config.InitialInterval)
 		if config.BackoffMax > 0 {
 			fmt.Printf(", max %v", config.BackoffMax)
@@ -250,6 +282,40 @@ func showExecutionInfo(config *cli.Config) {
 		}
 		if config.BackoffJitter > 0 {
 			fmt.Printf(", jitter %.1f%%", config.BackoffJitter*100)
+		}
+	case "exponential":
+		fmt.Printf("📈 Exponential strategy: base delay %v", config.BaseDelay)
+		if config.MaxDelay > 0 {
+			fmt.Printf(", max %v", config.MaxDelay)
+		}
+		if config.Multiplier > 0 {
+			fmt.Printf(", multiplier %.1fx", config.Multiplier)
+		}
+	case "fibonacci":
+		fmt.Printf("🌀 Fibonacci strategy: base delay %v", config.BaseDelay)
+		if config.MaxDelay > 0 {
+			fmt.Printf(", max %v", config.MaxDelay)
+		}
+	case "linear":
+		fmt.Printf("📏 Linear strategy: increment %v", config.Increment)
+		if config.MaxDelay > 0 {
+			fmt.Printf(", max %v", config.MaxDelay)
+		}
+	case "polynomial":
+		fmt.Printf("🔢 Polynomial strategy: base delay %v", config.BaseDelay)
+		if config.Exponent > 0 {
+			fmt.Printf(", exponent %.1f", config.Exponent)
+		}
+		if config.MaxDelay > 0 {
+			fmt.Printf(", max %v", config.MaxDelay)
+		}
+	case "decorrelated-jitter":
+		fmt.Printf("🎲 Decorrelated jitter strategy: base delay %v", config.BaseDelay)
+		if config.Multiplier > 0 {
+			fmt.Printf(", multiplier %.1fx", config.Multiplier)
+		}
+		if config.MaxDelay > 0 {
+			fmt.Printf(", max %v", config.MaxDelay)
 		}
 	case "load-adaptive":
 		fmt.Printf("⚖️  Load-adaptive execution: base interval %v", config.BaseInterval)

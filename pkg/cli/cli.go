@@ -36,11 +36,18 @@ type Config struct {
 	FailureThreshold float64       // circuit breaker failure threshold
 	ShowMetrics      bool          // show adaptive metrics
 
-	// Exponential backoff fields
-	InitialInterval   time.Duration // initial backoff interval
-	BackoffMax        time.Duration // maximum backoff interval
-	BackoffMultiplier float64       // backoff multiplier
+	// Exponential backoff fields (legacy - for backward compatibility)
+	InitialInterval   time.Duration // initial backoff interval (deprecated: use BaseDelay)
+	BackoffMax        time.Duration // maximum backoff interval (deprecated: use MaxDelay)
+	BackoffMultiplier float64       // backoff multiplier (deprecated: use Multiplier)
 	BackoffJitter     float64       // jitter factor (0.0-1.0)
+
+	// New unified strategy fields
+	BaseDelay  time.Duration // base/initial delay for all strategies
+	Increment  time.Duration // linear increment (linear strategy)
+	Multiplier float64       // exponential/jitter multiplier
+	Exponent   float64       // polynomial exponent
+	MaxDelay   time.Duration // maximum delay cap for all strategies
 
 	// Load-aware adaptive fields
 	TargetCPU    float64 // target CPU usage percentage (0-100)
@@ -239,30 +246,39 @@ func (p *argParser) parseSubcommand() error {
 // normalizeSubcommand converts abbreviations to full subcommand names
 func normalizeSubcommand(cmd string) string {
 	switch cmd {
-	// Interval variations
+	// NEW RETRY STRATEGIES (Mathematical Algorithms)
+	case "exponential", "exp":
+		return "exponential"
+	case "fibonacci", "fib":
+		return "fibonacci"
+	case "linear", "lin":
+		return "linear"
+	case "polynomial", "poly":
+		return "polynomial"
+	case "decorrelated-jitter", "dj":
+		return "decorrelated-jitter"
+
+	// EXISTING EXECUTION MODES (Operational Patterns)
 	case "interval", "int", "i":
 		return "interval"
-	// Count variations
 	case "count", "cnt", "c":
 		return "count"
-	// Duration variations
 	case "duration", "dur", "d":
 		return "duration"
-	// Rate limit variations
-	case "rate-limit", "rate", "rl", "r":
-		return "rate-limit"
-	// Adaptive variations
-	case "adaptive", "adapt", "a":
-		return "adaptive"
-	// Backoff variations
-	case "backoff", "back", "b":
-		return "backoff"
-	// Load-adaptive variations
-	case "load-adaptive", "load", "la":
-		return "load-adaptive"
-	// Cron variations
 	case "cron", "cr":
 		return "cron"
+	case "adaptive", "adapt", "a":
+		return "adaptive"
+
+	// EXISTING RATE CONTROL (Resource Management)
+	case "rate-limit", "rate", "rl", "r":
+		return "rate-limit"
+	case "load-adaptive", "load", "la":
+		return "load-adaptive"
+
+	// LEGACY SUPPORT (Backward Compatibility)
+	case "backoff", "back", "b":
+		return "backoff"
 	default:
 		return ""
 	}
@@ -338,9 +354,11 @@ func (p *argParser) parseSubcommandFlags() error {
 				return err
 			}
 		case "--multiplier":
-			if err := p.parseFloatFlag(&p.config.BackoffMultiplier); err != nil {
+			if err := p.parseFloatFlag(&p.config.Multiplier); err != nil {
 				return err
 			}
+			// Also set legacy field for backward compatibility
+			p.config.BackoffMultiplier = p.config.Multiplier
 		case "--jitter":
 			if err := p.parseFloatFlag(&p.config.BackoffJitter); err != nil {
 				return err
@@ -426,6 +444,25 @@ func (p *argParser) parseSubcommandFlags() error {
 			if err := p.parseIntFlag(&p.config.MaxRetries); err != nil {
 				return err
 			}
+
+		// NEW STRATEGY PARAMETERS
+		case "--base-delay", "-bd":
+			if err := p.parseDurationFlag(&p.config.BaseDelay); err != nil {
+				return err
+			}
+		case "--increment", "-inc":
+			if err := p.parseDurationFlag(&p.config.Increment); err != nil {
+				return err
+			}
+		case "--exponent", "-exp":
+			if err := p.parseFloatFlag(&p.config.Exponent); err != nil {
+				return err
+			}
+		case "--max-delay", "-md":
+			if err := p.parseDurationFlag(&p.config.MaxDelay); err != nil {
+				return err
+			}
+		// Note: --multiplier already exists at line 356, update it to use new field
 		default:
 			return fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -595,6 +632,46 @@ func ValidateConfig(config *Config) error {
 		// Validate cron configuration
 		if err := validateCronConfig(config); err != nil {
 			return fmt.Errorf("invalid cron config: %w", err)
+		}
+	case "exponential":
+		if config.BaseDelay == 0 {
+			return errors.New("--base-delay is required for exponential strategy")
+		}
+		// Validate exponential strategy configuration
+		if err := validateExponentialConfig(config); err != nil {
+			return fmt.Errorf("invalid exponential config: %w", err)
+		}
+	case "fibonacci":
+		if config.BaseDelay == 0 {
+			return errors.New("--base-delay is required for fibonacci strategy")
+		}
+		// Validate fibonacci strategy configuration
+		if err := validateFibonacciConfig(config); err != nil {
+			return fmt.Errorf("invalid fibonacci config: %w", err)
+		}
+	case "linear":
+		if config.Increment == 0 {
+			return errors.New("--increment is required for linear strategy")
+		}
+		// Validate linear strategy configuration
+		if err := validateLinearConfig(config); err != nil {
+			return fmt.Errorf("invalid linear config: %w", err)
+		}
+	case "polynomial":
+		if config.BaseDelay == 0 {
+			return errors.New("--base-delay is required for polynomial strategy")
+		}
+		// Validate polynomial strategy configuration
+		if err := validatePolynomialConfig(config); err != nil {
+			return fmt.Errorf("invalid polynomial config: %w", err)
+		}
+	case "decorrelated-jitter":
+		if config.BaseDelay == 0 {
+			return errors.New("--base-delay is required for decorrelated-jitter strategy")
+		}
+		// Validate decorrelated-jitter strategy configuration
+		if err := validateDecorrelatedJitterConfig(config); err != nil {
+			return fmt.Errorf("invalid decorrelated-jitter config: %w", err)
 		}
 	}
 
@@ -874,5 +951,125 @@ func (p *argParser) parseStringSliceFlag(target *[]string) error {
 	}
 
 	p.pos += 2
+	return nil
+}
+
+// validateExponentialConfig validates the exponential strategy configuration
+func validateExponentialConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.Multiplier == 0 {
+		config.Multiplier = 2.0
+	}
+	if config.MaxDelay == 0 {
+		config.MaxDelay = 60 * time.Second
+	}
+
+	// Validate bounds
+	if config.BaseDelay <= 0 {
+		return errors.New("base-delay must be positive")
+	}
+
+	if config.Multiplier <= 1.0 {
+		return errors.New("multiplier must be greater than 1.0")
+	}
+
+	if config.MaxDelay > 0 && config.MaxDelay < config.BaseDelay {
+		return errors.New("max-delay must be greater than base-delay")
+	}
+
+	return nil
+}
+
+// validateFibonacciConfig validates the fibonacci strategy configuration
+func validateFibonacciConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.MaxDelay == 0 {
+		config.MaxDelay = 60 * time.Second
+	}
+
+	// Validate bounds
+	if config.BaseDelay <= 0 {
+		return errors.New("base-delay must be positive")
+	}
+
+	if config.MaxDelay > 0 && config.MaxDelay < config.BaseDelay {
+		return errors.New("max-delay must be greater than base-delay")
+	}
+
+	return nil
+}
+
+// validateLinearConfig validates the linear strategy configuration
+func validateLinearConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.MaxDelay == 0 {
+		config.MaxDelay = 60 * time.Second
+	}
+
+	// Validate bounds
+	if config.Increment <= 0 {
+		return errors.New("increment must be positive")
+	}
+
+	if config.MaxDelay > 0 && config.MaxDelay < config.Increment {
+		return errors.New("max-delay must be greater than increment")
+	}
+
+	return nil
+}
+
+// validatePolynomialConfig validates the polynomial strategy configuration
+func validatePolynomialConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.Exponent == 0 {
+		config.Exponent = 2.0
+	}
+	if config.MaxDelay == 0 {
+		config.MaxDelay = 60 * time.Second
+	}
+
+	// Validate bounds
+	if config.BaseDelay <= 0 {
+		return errors.New("base-delay must be positive")
+	}
+
+	if config.Exponent <= 0 {
+		return errors.New("exponent must be positive")
+	}
+
+	if config.Exponent > 10.0 {
+		return errors.New("exponent must be <= 10.0 to prevent overflow")
+	}
+
+	if config.MaxDelay > 0 && config.MaxDelay < config.BaseDelay {
+		return errors.New("max-delay must be greater than base-delay")
+	}
+
+	return nil
+}
+
+// validateDecorrelatedJitterConfig validates the decorrelated-jitter strategy configuration
+func validateDecorrelatedJitterConfig(config *Config) error {
+	// Set defaults if not provided
+	if config.Multiplier == 0 {
+		config.Multiplier = 3.0 // AWS recommendation
+	}
+	if config.MaxDelay == 0 {
+		config.MaxDelay = 60 * time.Second
+	}
+
+	// Validate bounds
+	if config.BaseDelay <= 0 {
+		return errors.New("base-delay must be positive")
+	}
+
+	if config.Multiplier <= 1.0 {
+		return errors.New("multiplier must be greater than 1.0")
+	}
+
+	if config.MaxDelay > 0 && config.MaxDelay < config.BaseDelay {
+		return errors.New("max-delay must be greater than base-delay")
+	}
+
 	return nil
 }
