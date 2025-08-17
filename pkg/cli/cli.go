@@ -239,30 +239,39 @@ func (p *argParser) parseSubcommand() error {
 // normalizeSubcommand converts abbreviations to full subcommand names
 func normalizeSubcommand(cmd string) string {
 	switch cmd {
-	// Interval variations
+	// NEW RETRY STRATEGIES (Mathematical Algorithms)
+	case "exponential", "exp":
+		return "exponential"
+	case "fibonacci", "fib":
+		return "fibonacci"
+	case "linear", "lin":
+		return "linear"
+	case "polynomial", "poly":
+		return "polynomial"
+	case "decorrelated-jitter", "dj":
+		return "decorrelated-jitter"
+
+	// EXISTING EXECUTION MODES (Operational Patterns)
 	case "interval", "int", "i":
 		return "interval"
-	// Count variations
 	case "count", "cnt", "c":
 		return "count"
-	// Duration variations
 	case "duration", "dur", "d":
 		return "duration"
-	// Rate limit variations
-	case "rate-limit", "rate", "rl", "r":
-		return "rate-limit"
-	// Adaptive variations
-	case "adaptive", "adapt", "a":
-		return "adaptive"
-	// Backoff variations
-	case "backoff", "back", "b":
-		return "backoff"
-	// Load-adaptive variations
-	case "load-adaptive", "load", "la":
-		return "load-adaptive"
-	// Cron variations
 	case "cron", "cr":
 		return "cron"
+	case "adaptive", "adapt", "a":
+		return "adaptive"
+
+	// EXISTING RATE CONTROL (Resource Management)
+	case "rate-limit", "rate", "rl", "r":
+		return "rate-limit"
+	case "load-adaptive", "load", "la":
+		return "load-adaptive"
+
+	// LEGACY SUPPORT (Backward Compatibility)
+	case "backoff", "back", "b":
+		return "backoff"
 	default:
 		return ""
 	}
