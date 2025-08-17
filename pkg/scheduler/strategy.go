@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"sync"
 	"time"
 
 	"github.com/swi/repeater/pkg/strategies"
@@ -16,6 +17,8 @@ type StrategyScheduler struct {
 	nextChan       chan time.Time
 	stopChan       chan struct{}
 	stopped        bool
+	mu             sync.RWMutex // Protects stopped field
+	stopOnce       sync.Once    // Ensures Stop() is idempotent
 }
 
 // NewStrategyScheduler creates a new strategy-based scheduler
@@ -38,9 +41,12 @@ func NewStrategyScheduler(strategy strategies.Strategy, config *strategies.Strat
 
 // Next returns a channel that delivers the next execution time
 func (s *StrategyScheduler) Next() <-chan time.Time {
+	s.mu.RLock()
 	if s.stopped {
+		s.mu.RUnlock()
 		return s.nextChan
 	}
+	s.mu.RUnlock()
 
 	go func() {
 		s.currentAttempt++
@@ -68,7 +74,10 @@ func (s *StrategyScheduler) Next() <-chan time.Time {
 
 				select {
 				case <-timer.C:
-					if !s.stopped {
+					s.mu.RLock()
+					stopped := s.stopped
+					s.mu.RUnlock()
+					if !stopped {
 						select {
 						case s.nextChan <- time.Now():
 						case <-s.stopChan:
@@ -80,7 +89,10 @@ func (s *StrategyScheduler) Next() <-chan time.Time {
 				}
 			} else {
 				// Immediate execution
-				if !s.stopped {
+				s.mu.RLock()
+				stopped := s.stopped
+				s.mu.RUnlock()
+				if !stopped {
 					select {
 					case s.nextChan <- time.Now():
 					case <-s.stopChan:
@@ -96,10 +108,12 @@ func (s *StrategyScheduler) Next() <-chan time.Time {
 
 // Stop stops the scheduler
 func (s *StrategyScheduler) Stop() {
-	if !s.stopped {
+	s.stopOnce.Do(func() {
+		s.mu.Lock()
 		s.stopped = true
+		s.mu.Unlock()
 		close(s.stopChan)
-	}
+	})
 }
 
 // UpdateExecutionResult updates the scheduler with the result of the last execution
