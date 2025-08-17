@@ -84,9 +84,105 @@ Repeater has achieved feature completeness with all core functionality implement
 - **Metrics Collection**: Prometheus-compatible metrics export
 - **Enhanced Testing**: 210+ tests with 90%+ coverage and performance benchmarks
 
+## 🔄 Planned Major Refactor: CLI Strategy Interface (v1.0.0)
+
+**Status**: In Development
+**Priority**: High (Breaking change window before public release)
+**Timeline**: 10-15 days
+**Effort**: 80-120 hours
+
+### Refactor Overview
+Transform Repeater from mode-based to strategy-based interface, adopting Patience's intuitive approach while preserving all existing functionality.
+
+#### Target Transformation
+```bash
+# FROM: Mode-based (current)
+rpr backoff --initial-delay 1s --attempts 5 -- command
+rpr interval --every 30s --times 10 -- command
+rpr rate-limit --rate 100/1h -- command
+
+# TO: Strategy-based (target)
+rpr exponential --initial-delay 1s --attempts 5 -- command
+rpr interval --every 30s --times 10 -- command  
+rpr rate-limit --rate 100/1h -- command
+```
+
+### Implementation Phases
+
+#### Phase 1: Analysis & Design (1-2 days)
+- **1.1 Strategy Mapping Analysis**: Map current modes to strategy names
+- **1.2 CLI Architecture Design**: Design new subcommand structure
+- **1.3 Migration Strategy**: Plan deprecation timeline and compatibility
+
+#### Phase 2: Core Strategy Implementation (3-4 days)
+- **2.1 Add Missing Mathematical Strategies**:
+  - `fibonacci` - Moderate growth retry (1s, 1s, 2s, 3s, 5s, 8s...)
+  - `linear` - Predictable incremental retry (1s, 2s, 3s, 4s...)
+  - `polynomial` - Customizable growth retry with exponent
+  - `decorrelated-jitter` - AWS-recommended distributed retry
+- **2.2 Refactor Existing Strategies**: `backoff` → `exponential` for clarity
+- **2.3 Preserve Execution Modes**: Keep `interval`, `count`, `duration`, `cron`
+
+#### Phase 3: Parameter Unification (2-3 days)
+- **3.1 Standardize Common Parameters**: `--attempts`, `--timeout`, `--success-pattern`
+- **3.2 Strategy-Specific Parameters**: Tailored parameters per mathematical strategy
+
+#### Phase 4: CLI Infrastructure (2-3 days)
+- **4.1 Help System Redesign**: Strategy-organized main help
+- **4.2 Subcommand Architecture**: Strategy-based parsing and validation
+- **4.3 Abbreviation System**: `exp`, `fib`, `lin`, `poly`, `dj` for new strategies
+
+#### Phase 5: Backward Compatibility (1-2 days)
+- **5.1 Legacy Alias System**: Support old interface with deprecation warnings
+- **5.2 Migration Guide**: Documentation for transitioning users
+
+#### Phase 6: Documentation & Testing (2-3 days)
+- **6.1 Update Documentation**: Rewrite with strategy-first examples
+- **6.2 Test Strategy Coverage**: Comprehensive testing of new interface
+
+### Strategy Mapping Table
+| Current Mode | New Strategy | Parameters | Notes |
+|-------------|-------------|------------|--------|
+| `backoff` | `exponential` | `--base-delay`, `--multiplier`, `--max-delay` | Direct rename for clarity |
+| `adaptive` | `adaptive` | `--base-interval`, `--learning-rate` | Keep as-is (clear name) |
+| `rate-limit` | `rate-limit` | `--rate`, `--retry-pattern` | Execution mode, not strategy |
+| `interval` | `interval` | `--every`, `--times`, `--for` | Execution mode, not strategy |
+| `count` | `count` | `--times` | Execution mode, not strategy |
+| `duration` | `duration` | `--for`, `--every` | Execution mode, not strategy |
+| `cron` | `cron` | `--cron`, `--timezone` | Execution mode, not strategy |
+
+### New Strategies to Add
+| Strategy | Primary Use Case | Key Parameters |
+|----------|-----------------|----------------|
+| `fibonacci` | Moderate growth retry | `--base-delay`, `--max-delay` |
+| `linear` | Predictable incremental retry | `--increment`, `--max-delay` |
+| `polynomial` | Customizable growth retry | `--base-delay`, `--exponent`, `--max-delay` |
+| `decorrelated-jitter` | High-scale distributed retry | `--base-delay`, `--multiplier`, `--max-delay` |
+
+### Success Criteria
+- ✅ Intuitive strategy selection (`rpr fibonacci` vs `rpr backoff --fibonacci`)
+- ✅ Mathematical strategy names match user mental models
+- ✅ Consistent parameter naming across strategies
+- ✅ Backward compatibility with deprecation path
+- ✅ Enhanced strategy discoverability via help system
+- ✅ No functionality lost in refactor
+
+### Migration Strategy
+```bash
+# Legacy support with deprecation warnings
+$ rpr backoff --initial-delay 1s -- command
+⚠️  'backoff' is deprecated, use 'exponential' instead
+
+# Automatic parameter mapping
+$ rpr backoff --initial-delay 1s -- command
+# → internally maps to: rpr exponential --base-delay 1s -- command
+```
+
+---
+
 ## 🚀 Future Enhancement Opportunities (Optional)
 
-The core product is complete and production-ready. These potential enhancements could be considered for future development based on user needs:
+After v1.0.0 CLI refactor completion, these potential enhancements could be considered for future development based on user needs:
 
 ### Phase 1: Extended Observability (Low Priority)
 **Timeline**: 2-3 weeks
