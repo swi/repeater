@@ -897,17 +897,22 @@ func (er *ErrorReporter) logError(err *rprErrors.CategorizedError) {
 
 // logErrorText logs an error in text format
 func (er *ErrorReporter) logErrorText(err *rprErrors.CategorizedError) {
-	fmt.Fprintf(er.writer, "[%s] %s category=%s severity=%s",
+	if _, writeErr := fmt.Fprintf(er.writer, "[%s] %s category=%s severity=%s",
 		err.Timestamp().Format(time.RFC3339),
 		err.Error(),
 		err.Category().String(),
-		err.Severity().String())
-
-	if context := err.Context(); context != nil {
-		fmt.Fprintf(er.writer, " context=%v", context)
+		err.Severity().String()); writeErr != nil {
+		// Ignore write errors to avoid cascading failures
+		return
 	}
 
-	fmt.Fprintln(er.writer)
+	if context := err.Context(); context != nil {
+		if _, writeErr := fmt.Fprintf(er.writer, " context=%v", context); writeErr != nil {
+			return
+		}
+	}
+
+	_, _ = fmt.Fprintln(er.writer) // Ignore error on final newline
 }
 
 // logErrorJSON logs an error in JSON format
@@ -924,7 +929,7 @@ func (er *ErrorReporter) logErrorJSON(err *rprErrors.CategorizedError) {
 	}
 
 	jsonData, _ := json.Marshal(logEntry)
-	fmt.Fprintln(er.writer, string(jsonData))
+	_, _ = fmt.Fprintln(er.writer, string(jsonData)) // Ignore write error
 }
 
 // logRecoveryAttempt logs a recovery attempt
@@ -934,19 +939,23 @@ func (er *ErrorReporter) logRecoveryAttempt(err error, attempt int, success bool
 		status = "succeeded"
 	}
 
-	fmt.Fprintf(er.writer, "[%s] recovery_attempt attempt=%d status=%s",
-		time.Now().Format(time.RFC3339), attempt, status)
-
-	if err != nil {
-		fmt.Fprintf(er.writer, " error=%s", err.Error())
+	if _, writeErr := fmt.Fprintf(er.writer, "[%s] recovery_attempt attempt=%d status=%s",
+		time.Now().Format(time.RFC3339), attempt, status); writeErr != nil {
+		return
 	}
 
-	fmt.Fprintln(er.writer)
+	if err != nil {
+		if _, writeErr := fmt.Fprintf(er.writer, " error=%s", err.Error()); writeErr != nil {
+			return
+		}
+	}
+
+	_, _ = fmt.Fprintln(er.writer) // Ignore error on final newline
 }
 
 // logCircuitBreakerStateChange logs a circuit breaker state change
 func (er *ErrorReporter) logCircuitBreakerStateChange(name string, oldState, newState CircuitBreakerState) {
-	fmt.Fprintf(er.writer, "[%s] circuit_breaker_state_change service=%s old_state=%s new_state=%s\n",
+	_, _ = fmt.Fprintf(er.writer, "[%s] circuit_breaker_state_change service=%s old_state=%s new_state=%s\n",
 		time.Now().Format(time.RFC3339), name, oldState.String(), newState.String())
 }
 

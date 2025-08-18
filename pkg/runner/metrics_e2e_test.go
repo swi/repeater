@@ -54,7 +54,7 @@ func TestMetricsServerEndToEnd(t *testing.T) {
 	metricsURL := fmt.Sprintf("http://localhost:%d/metrics", port)
 	resp, err := http.Get(metricsURL)
 	require.NoError(t, err, "Metrics endpoint should be accessible")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Metrics endpoint should return 200 OK")
 	assert.Equal(t, "text/plain; version=0.0.4; charset=utf-8", resp.Header.Get("Content-Type"), "Should return Prometheus format")
@@ -83,7 +83,7 @@ func TestMetricsServerEndToEnd(t *testing.T) {
 	// Check metrics endpoint again to see updated values
 	resp, err = http.Get(metricsURL)
 	require.NoError(t, err, "Metrics endpoint should still be accessible")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err = io.ReadAll(resp.Body)
 	require.NoError(t, err, "Should be able to read updated metrics response")
@@ -153,7 +153,7 @@ func TestMetricsServerWithAdaptiveScheduling(t *testing.T) {
 
 	resp, err := http.Get(metricsURL)
 	require.NoError(t, err, "Metrics endpoint should work with adaptive scheduling")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Should be able to read metrics")
@@ -197,7 +197,7 @@ func TestMetricsServerWithConfigFile(t *testing.T) {
 
 	resp, err := http.Get(metricsURL)
 	require.NoError(t, err, "Metrics endpoint should work with config file settings")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Metrics endpoint should return 200 OK")
 }

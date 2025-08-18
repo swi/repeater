@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -262,7 +263,12 @@ func (e *Executor) Execute(ctx context.Context, command []string) (*ExecutionRes
 
 // streamOutput handles real-time streaming of command output
 func (e *Executor) streamOutput(pipe io.ReadCloser, buffer *bytes.Buffer, streamType string, command []string) {
-	defer pipe.Close()
+	defer func() {
+		if err := pipe.Close(); err != nil {
+			// Log pipe close error but don't fail the execution
+			fmt.Fprintf(os.Stderr, "Warning: failed to close %s pipe: %v\n", streamType, err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(pipe)
 	for scanner.Scan() {
@@ -288,7 +294,10 @@ func (e *Executor) streamOutput(pipe io.ReadCloser, buffer *bytes.Buffer, stream
 					output = e.outputPrefix + " " + output
 				}
 			}
-			fmt.Fprintln(e.streamWriter, output)
+			if _, err := fmt.Fprintln(e.streamWriter, output); err != nil {
+				// Log write error but continue processing
+				fmt.Fprintf(os.Stderr, "Warning: failed to write to stream: %v\n", err)
+			}
 		}
 	}
 }

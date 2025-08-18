@@ -141,14 +141,12 @@ func TestDecorrelatedJitterStrategy_NextDelay_MaxDelayRespected(t *testing.T) {
 }
 
 func TestDecorrelatedJitterStrategy_NextDelay_RandomnessDistribution(t *testing.T) {
-	strategy := NewDecorrelatedJitterStrategy(1*time.Second, 2.0, 0)
-
 	// Collect delays from multiple runs to verify randomness
 	delays := make([]time.Duration, 100)
 	for i := 0; i < 100; i++ {
-		strategy = NewDecorrelatedJitterStrategy(1*time.Second, 2.0, 0) // reset for each run
-		strategy.NextDelay(1, 0)                                        // first delay (always 1s)
-		delays[i] = strategy.NextDelay(2, 0)                            // second delay (should vary between 1s and 2s)
+		strategy := NewDecorrelatedJitterStrategy(1*time.Second, 2.0, 0) // reset for each run
+		strategy.NextDelay(1, 0)                                         // first delay (always 1s)
+		delays[i] = strategy.NextDelay(2, 0)                             // second delay (should vary between 1s and 2s)
 	}
 
 	// Verify we have some variation in delays

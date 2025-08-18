@@ -114,6 +114,7 @@ func TestErrorReporter_TrendAnalysis(t *testing.T) {
 
 	if timeoutTrend == nil {
 		t.Error("Expected timeout trend in analysis")
+		return
 	}
 
 	if timeoutTrend.Count != 5 {
@@ -157,6 +158,7 @@ func TestErrorReporter_AlertGeneration(t *testing.T) {
 
 	if alert == nil {
 		t.Error("Expected alert when threshold is crossed")
+		return
 	}
 
 	if alert.Category != errors.CategoryNetwork {
@@ -252,6 +254,7 @@ func TestErrorReporter_MetricsIntegration(t *testing.T) {
 	metrics := reporter.GetMetrics()
 	if metrics == nil {
 		t.Error("Expected metrics to be available")
+		return
 	}
 
 	if metrics.TotalErrors != 3 {

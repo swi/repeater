@@ -198,6 +198,7 @@ func TestErrorPattern_ThresholdAlert(t *testing.T) {
 	alert := detector.RecordError(NewCategorizedError(networkErr, CategoryNetwork, SeverityHigh))
 	if alert == nil {
 		t.Error("Expected alert when threshold is crossed")
+		return
 	}
 
 	if alert.Category != CategoryNetwork {

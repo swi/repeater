@@ -54,7 +54,7 @@ func TestHealthServerEndToEnd(t *testing.T) {
 	healthURL := fmt.Sprintf("http://localhost:%d/health", port)
 	resp, err := http.Get(healthURL)
 	require.NoError(t, err, "Health endpoint should be accessible")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Health endpoint should return 200 OK")
 
@@ -72,7 +72,7 @@ func TestHealthServerEndToEnd(t *testing.T) {
 	readyURL := fmt.Sprintf("http://localhost:%d/ready", port)
 	resp, err = http.Get(readyURL)
 	require.NoError(t, err, "Ready endpoint should be accessible")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Ready endpoint should return 200 OK")
 
@@ -87,7 +87,7 @@ func TestHealthServerEndToEnd(t *testing.T) {
 	liveURL := fmt.Sprintf("http://localhost:%d/live", port)
 	resp, err = http.Get(liveURL)
 	require.NoError(t, err, "Live endpoint should be accessible")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Live endpoint should return 200 OK")
 
@@ -104,7 +104,7 @@ func TestHealthServerEndToEnd(t *testing.T) {
 	// Check health endpoint again to see updated metrics
 	resp, err = http.Get(healthURL)
 	require.NoError(t, err, "Health endpoint should still be accessible")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.NewDecoder(resp.Body).Decode(&healthResp)
 	require.NoError(t, err, "Health response should still be valid JSON")
@@ -162,7 +162,7 @@ func TestHealthServerWithConfigFile(t *testing.T) {
 
 	resp, err := http.Get(healthURL)
 	require.NoError(t, err, "Health endpoint should work with config file settings")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Health endpoint should return 200 OK")
 }
