@@ -124,7 +124,6 @@ Repeater supports multiple levels of abbreviations for faster typing:
 | `cron` | `cr` | `cr` | `rpr cr --cron "0 9 * * *" -- ./backup.sh` |
 | `rate-limit` | `rate` | `rl` | `rpr rl -r 10/1h -- curl api.com` |
 | `adaptive` | `adapt` | `a` | `rpr a -b 1s -- curl api.com` |
-| `backoff` | `back` | `b` | `rpr b -i 100ms -- curl api.com` |
 | `load-adaptive` | `load` | `la` | `rpr la -b 1s -- ./task.sh` |
 
 ### Flag Abbreviations
@@ -233,20 +232,7 @@ rpr adaptive --base-interval 30s --min-interval 10s --max-interval 5m -- mysql -
 rpr a -b 1s --show-metrics -- curl https://api.com
 ```
 
-### Exponential Backoff
 
-Implement exponential backoff for resilient execution against unreliable services.
-
-```bash
-# Retry unreliable API with backoff
-rpr backoff --initial-delay 100ms --max 30s --multiplier 2.0 -- curl https://flaky-api.com
-
-# Database connection with jitter
-rpr backoff --initial-delay 1s --max 60s --jitter 0.1 --times 10 -- mysql -e "SELECT 1"
-
-# Abbreviated
-rpr b -i 100ms --max 30s -- curl https://unreliable-service.com
-```
 
 ### Load-Aware Scheduling
 

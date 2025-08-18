@@ -12,7 +12,7 @@ This document outlines current features, completed development cycles, immediate
 
 ### Core CLI & Execution Engine
 - **Multi-level Abbreviations**: Power user shortcuts (`rpr i -e 30s -t 5 -- curl api.com`)
-- **13 Scheduling Modes**: interval, count, duration, cron, adaptive, load-aware, rate-limit + exponential, fibonacci, linear, polynomial, decorrelated-jitter
+- **12 Scheduling Modes**: interval, count, duration, cron, adaptive, load-aware, rate-limit + exponential, fibonacci, linear, polynomial, decorrelated-jitter
 - **Mathematical Retry Strategies**: exponential, fibonacci, linear, polynomial backoff algorithms
 - **Unix Pipeline Integration**: Clean output, proper exit codes, real-time streaming
 - **Pattern Matching**: Regex-based success/failure detection with precedence rules
@@ -88,7 +88,7 @@ This document outlines current features, completed development cycles, immediate
 ### v0.3.0 - Advanced Features Complete (January 13, 2025)
 - **Cron Scheduling**: Standard expressions, shortcuts, timezone support
 - **Plugin System**: Extensible architecture for custom schedulers and executors
-- **Advanced Schedulers**: adaptive, backoff, load-aware, rate-limiting modes
+- **Advanced Schedulers**: adaptive, load-aware, rate-limiting modes
 - **HTTP-Aware Intelligence**: Automatic response parsing for optimal API scheduling
 - **Pattern Matching**: Regex success/failure detection with precedence
 - **Configuration Files**: TOML support with environment variable overrides
@@ -101,7 +101,7 @@ This document outlines current features, completed development cycles, immediate
 - **Strategy-Based Help System**: Organized interface with execution modes, retry strategies, and adaptive scheduling
 - **Unified Parameters**: --base-delay, --increment, --exponent, --max-delay (fully documented and validated)
 - **Complete Validation**: Strategy-specific validation with helpful error messages
-- **Deprecation Warnings**: Legacy backoff command shows migration guidance
+
 - **Full User Experience**: All strategies discoverable and properly documented
 
 ### v0.4.1 - Test Coverage Enhancement Complete (January 17, 2025) ✅ **COMPLETE**
@@ -170,8 +170,8 @@ rpr --help  # Shows organized: execution modes, mathematical strategies, adaptiv
 - ✅ **4.4 Strategy Discovery**: All strategies visible and documented for users
 
 #### Phase 5: Backward Compatibility ✅ COMPLETE
-- ✅ **5.1 Legacy Aliases**: `backoff` still supported (maps to exponential internally)
-- ✅ **5.2 Deprecation Warnings**: Clear warnings guide users to new `exponential` strategy
+- ✅ **5.1 Legacy Removal**: `backoff` command removed, users directed to use `exponential` strategy
+- ✅ **5.2 Clean Architecture**: Simplified codebase with legacy code eliminated
 
 #### Phase 6: Documentation & Testing ✅ COMPLETE
 - ✅ **6.1 Strategy Tests**: Comprehensive backend testing complete
@@ -200,7 +200,7 @@ rpr --help  # Shows organized: execution modes, mathematical strategies, adaptiv
 - ✅ **Intuitive strategy selection**: `rpr fibonacci` works perfectly and is discoverable
 - ✅ **Mathematical strategy names**: All strategies implemented with clear, descriptive names
 - ✅ **Consistent parameter naming**: `--base-delay`, `--max-delay` standardized across strategies
-- ✅ **Backward compatibility**: `backoff` continues working with deprecation guidance
+- ✅ **Code simplification**: Legacy `backoff` removed, users migrate to modern `exponential` strategy
 - ✅ **Enhanced discoverability**: All strategies visible in organized help system
 - ✅ **No functionality lost**: All existing functionality preserved and enhanced
 
@@ -212,15 +212,15 @@ $ rpr --help
 # - EXECUTION MODES: interval, count, duration, cron
 # - MATHEMATICAL RETRY STRATEGIES: exponential, fibonacci, linear, polynomial, decorrelated-jitter
 # - ADAPTIVE SCHEDULING: adaptive, load-adaptive
-# - LEGACY (DEPRECATED): backoff (with migration guidance)
+# - LEGACY REMOVED: backoff (use exponential instead)
 
 # ✅ FUNCTIONAL: All strategies work perfectly with proper validation
 $ rpr exponential --base-delay 1s --attempts 3 -- echo "success"
 # Works flawlessly with comprehensive error messages for invalid parameters
 
-# ✅ GUIDED: Deprecation warnings help users migrate
-$ rpr backoff --initial-delay 1s --verbose -- command
-# ⚠️  Warning: 'backoff' is deprecated, use 'exponential' instead
+# ✅ CLEAN: Legacy command removed, use modern equivalent
+$ rpr exponential --base-delay 1s --verbose -- command
+# 📈 Exponential strategy: base delay 1s, multiplier 2.0x
 ```
 
 ## 🔧 Immediate Maintenance & Quality Improvements (v0.4.2)
@@ -255,8 +255,8 @@ Based on codebase review, the following items should be addressed to improve cod
 - **Enhance Testability**: Make individual components easier to unit test
 
 #### Legacy Code Cleanup
-- **Evaluate Scheduler Redundancy**: Assess overlap between `pkg/scheduler/backoff.go` and `pkg/strategies/exponential.go`
-- **Define Deprecation Path**: Create clear migration timeline for legacy exponential backoff scheduler
+- **Completed Legacy Removal**: Eliminated `pkg/scheduler/backoff.go` and legacy `backoff` subcommand
+- **Simplified Architecture**: Clean separation between operational modes and mathematical strategies
 - **Update Documentation**: Clarify relationship between legacy and new implementations
 
 ### **Priority 3: Technical Debt Resolution (2-3 weeks)**

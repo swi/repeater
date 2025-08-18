@@ -22,7 +22,7 @@ func (e *ExitError) Error() string {
 	return e.Message
 }
 
-const version = "0.4.1"
+const version = "0.5.0"
 
 func main() {
 	config, err := cli.ParseArgs(os.Args[1:])
@@ -270,18 +270,6 @@ func showExecutionInfo(config *cli.Config) {
 		}
 		if config.ShowMetrics {
 			fmt.Printf(", with metrics")
-		}
-	case "backoff":
-		fmt.Fprintf(os.Stderr, "⚠️  Warning: 'backoff' is deprecated, use 'exponential' instead\n")
-		fmt.Printf("📈 Exponential backoff: initial %v", config.InitialInterval)
-		if config.BackoffMax > 0 {
-			fmt.Printf(", max %v", config.BackoffMax)
-		}
-		if config.BackoffMultiplier > 0 {
-			fmt.Printf(", multiplier %.1fx", config.BackoffMultiplier)
-		}
-		if config.BackoffJitter > 0 {
-			fmt.Printf(", jitter %.1f%%", config.BackoffJitter*100)
 		}
 	case "exponential":
 		fmt.Printf("📈 Exponential strategy: base delay %v", config.BaseDelay)

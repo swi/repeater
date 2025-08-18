@@ -128,26 +128,3 @@ func TestRunner_PatternMatchingWithAdaptiveScheduler(t *testing.T) {
 	assert.Equal(t, 5, stats.TotalExecutions)
 	assert.Equal(t, 5, stats.SuccessfulExecutions+stats.FailedExecutions)
 }
-
-func TestRunner_PatternMatchingWithBackoffScheduler(t *testing.T) {
-	config := &cli.Config{
-		Subcommand:      "backoff",
-		InitialInterval: 50 * time.Millisecond,
-		Times:           3,
-		FailurePattern:  "circuit breaker test",
-		Command:         []string{"echo", "circuit breaker test"},
-	}
-
-	runner, err := NewRunner(config)
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	stats, err := runner.Run(ctx)
-	require.NoError(t, err)
-
-	// All executions should fail due to failure pattern
-	assert.Equal(t, 0, stats.SuccessfulExecutions)
-	assert.Equal(t, 3, stats.FailedExecutions)
-}

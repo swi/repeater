@@ -106,11 +106,6 @@ func NewRunner(config *cli.Config) (*Runner, error) {
 			return nil, errors.New("load-adaptive requires --base-interval")
 		}
 
-	// LEGACY SUPPORT
-	case "backoff":
-		if config.InitialInterval == 0 {
-			return nil, errors.New("backoff requires --initial-delay")
-		}
 	default:
 		return nil, errors.New("unknown subcommand: " + config.Subcommand)
 	}
@@ -453,9 +448,6 @@ func (r *Runner) createScheduler() (Scheduler, error) {
 	case "load-adaptive":
 		baseScheduler, err = r.createLoadAdaptiveScheduler()
 
-	// LEGACY SUPPORT
-	case "backoff":
-		baseScheduler, err = r.createBackoffScheduler()
 	default:
 		return nil, fmt.Errorf("unknown subcommand: %s", r.config.Subcommand)
 	}
@@ -697,16 +689,6 @@ func (r *Runner) createAdaptiveScheduler() (Scheduler, error) {
 	return NewAdaptiveSchedulerWrapper(scheduler, r.config), nil
 }
 
-// createBackoffScheduler creates an exponential backoff scheduler
-func (r *Runner) createBackoffScheduler() (Scheduler, error) {
-	return scheduler.NewExponentialBackoffScheduler(
-		r.config.InitialInterval,
-		r.config.BackoffMultiplier,
-		r.config.BackoffMax,
-		r.config.BackoffJitter,
-	), nil
-}
-
 // createLoadAdaptiveScheduler creates a load-aware adaptive scheduler
 func (r *Runner) createLoadAdaptiveScheduler() (Scheduler, error) {
 	return scheduler.NewLoadAwareSchedulerWithBounds(
@@ -808,10 +790,6 @@ func (r *Runner) getBaseDelay() time.Duration {
 	if r.config.BaseDelay > 0 {
 		return r.config.BaseDelay
 	}
-	// Fallback to legacy field for backward compatibility
-	if r.config.InitialInterval > 0 {
-		return r.config.InitialInterval
-	}
 	return 1 * time.Second // Default
 }
 
@@ -826,10 +804,6 @@ func (r *Runner) getMultiplier() float64 {
 	if r.config.Multiplier > 0 {
 		return r.config.Multiplier
 	}
-	// Fallback to legacy field for backward compatibility
-	if r.config.BackoffMultiplier > 0 {
-		return r.config.BackoffMultiplier
-	}
 	return 2.0 // Default
 }
 
@@ -843,10 +817,6 @@ func (r *Runner) getExponent() float64 {
 func (r *Runner) getMaxDelay() time.Duration {
 	if r.config.MaxDelay > 0 {
 		return r.config.MaxDelay
-	}
-	// Fallback to legacy field for backward compatibility
-	if r.config.BackoffMax > 0 {
-		return r.config.BackoffMax
 	}
 	return 60 * time.Second // Default
 }
