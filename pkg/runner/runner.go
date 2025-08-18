@@ -13,6 +13,7 @@ import (
 	"github.com/swi/repeater/pkg/executor"
 	"github.com/swi/repeater/pkg/health"
 	"github.com/swi/repeater/pkg/httpaware"
+	"github.com/swi/repeater/pkg/interfaces"
 	"github.com/swi/repeater/pkg/metrics"
 	"github.com/swi/repeater/pkg/ratelimit"
 	"github.com/swi/repeater/pkg/scheduler"
@@ -330,11 +331,8 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 	}
 }
 
-// Scheduler interface for type safety
-type Scheduler interface {
-	Next() <-chan time.Time
-	Stop()
-}
+// Use centralized Scheduler interface from pkg/interfaces
+type Scheduler = interfaces.Scheduler
 
 // RateLimitScheduler implements Scheduler using Diophantine rate limiting
 type RateLimitScheduler struct {

@@ -3,13 +3,12 @@ package plugin
 import (
 	"context"
 	"time"
+
+	"github.com/swi/repeater/pkg/interfaces"
 )
 
-// Scheduler interface represents a command scheduler (imported from scheduler package concept)
-type Scheduler interface {
-	Next() <-chan time.Time
-	Stop()
-}
+// Use centralized Scheduler interface from pkg/interfaces
+type Scheduler = interfaces.Scheduler
 
 // SchedulerPlugin interface defines the contract for scheduler plugins
 type SchedulerPlugin interface {

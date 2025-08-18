@@ -6,13 +6,11 @@ import (
 	"time"
 
 	"github.com/swi/repeater/pkg/cron"
+	"github.com/swi/repeater/pkg/interfaces"
 )
 
-// Scheduler interface for type safety
-type Scheduler interface {
-	Next() <-chan time.Time
-	Stop()
-}
+// Use centralized Scheduler interface from pkg/interfaces
+type Scheduler = interfaces.Scheduler
 
 // CronScheduler implements Scheduler using cron expressions
 type CronScheduler struct {

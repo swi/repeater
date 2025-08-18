@@ -10,6 +10,7 @@
 /rpr-*
 rpr-test
 rpr-optimized
+test-binary
 
 # Test binary, built with `go test -c`
 *.test
@@ -59,6 +60,7 @@ tmp/
 # Log files
 *.log
 test_results.log
+test_output.log
 
 # Configuration files (if they contain secrets)
 config.local.toml

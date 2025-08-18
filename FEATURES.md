@@ -1,8 +1,12 @@
 # Repeater Feature Roadmap
 
-## 🎉 Current Status: **PRODUCTION READY WITH COMPREHENSIVE TEST COVERAGE (v0.4.1)**
+## 🎉 Current Status: **PRODUCTION READY WITH IDENTIFIED MAINTENANCE OPPORTUNITIES (v0.4.1)**
 
-Repeater has successfully completed both the major CLI Strategy Interface refactor and comprehensive test coverage enhancement, achieving 94.7% test coverage for mathematical retry strategies. All strategies are now discoverable, properly validated, thoroughly tested, and production-ready. This document outlines current features, completed development cycles, and future enhancements.
+Repeater has successfully completed both the major CLI Strategy Interface refactor and comprehensive test coverage enhancement, achieving 94.7% test coverage for mathematical retry strategies. All strategies are now discoverable, properly validated, thoroughly tested, and production-ready. 
+
+**Recent Codebase Review**: Identified maintenance opportunities for v0.4.2 to improve code quality, eliminate technical debt, and optimize architecture. No critical issues affect production readiness, but addressing these items will enhance maintainability and developer experience.
+
+This document outlines current features, completed development cycles, immediate maintenance priorities, and future enhancements.
 
 ## ✅ Implemented Features (v0.3.0)
 
@@ -108,6 +112,14 @@ Repeater has successfully completed both the major CLI Strategy Interface refact
 - **Production Quality Assurance**: All 17 test packages passing with robust error handling and validation
 - **Complete Integration Testing**: End-to-end validation confirms all strategies work in production environment
 
+### v0.4.2 - Code Quality & Maintenance (Planned) 🔄 **PLANNED**
+- **Version Consistency**: Fix version mismatch and standardize version references across codebase
+- **Interface Consolidation**: Eliminate duplicate Scheduler interfaces, create centralized pkg/interfaces
+- **CLI Parser Refactoring**: Split large cli.go into focused modules (parser, config, validation, flags)
+- **Legacy Code Cleanup**: Define deprecation path for redundant scheduler implementations
+- **Technical Debt Resolution**: Implement pending TODOs, address skipped tests, parameterize hardcoded values
+- **Repository Cleanup**: Remove temporary files, fix .gitignore, optimize .archive directory
+
 ## ✅ Completed Major Refactor: CLI Strategy Interface (v0.4.0)
 
 **Status**: 100% Complete - Production Ready
@@ -211,9 +223,108 @@ $ rpr backoff --initial-delay 1s --verbose -- command
 # ⚠️  Warning: 'backoff' is deprecated, use 'exponential' instead
 ```
 
+## 🔧 Immediate Maintenance & Quality Improvements (v0.4.2)
+
+Based on codebase review, the following items should be addressed to improve code quality and maintainability:
+
+### **Priority 1: Critical Fixes (1-2 days)**
+**Timeline**: Immediate
+**Effort**: 4-8 hours
+
+#### Version & Configuration Consistency
+- **Fix Version Mismatch**: Update `cmd/rpr/main.go` version constant from "0.4.0" to "0.4.1"
+- **Consolidate Scheduler Interfaces**: Create single `pkg/interfaces/scheduler.go` to eliminate duplicate interface definitions across `pkg/runner`, `pkg/plugin`, and `pkg/scheduler`
+- **Update .gitignore**: Add missing entries for `.DS_Store`, `*.log`, and compiled binaries
+
+#### File Cleanup
+- **Remove Temporary Files**: Clean up `test_output.log`, `test_results.log`, and compiled `rpr` binary
+- **Address .DS_Store Files**: Remove macOS system files from repository
+- **Optimize .archive Directory**: Document purpose or remove redundant 288K of archived content
+
+### **Priority 2: Code Quality Improvements (1 week)**
+**Timeline**: 1-2 weeks
+**Effort**: 16-24 hours
+
+#### CLI Parser Refactoring
+- **Split Large CLI File**: Refactor 1,075-line `pkg/cli/cli.go` into focused modules:
+  - `cli/parser.go` - Argument parsing logic
+  - `cli/config.go` - Configuration structure and defaults
+  - `cli/validation.go` - Validation functions and error handling
+  - `cli/flags.go` - Flag definitions and mappings
+- **Improve Single Responsibility**: Separate parsing, validation, and configuration concerns
+- **Enhance Testability**: Make individual components easier to unit test
+
+#### Legacy Code Cleanup
+- **Evaluate Scheduler Redundancy**: Assess overlap between `pkg/scheduler/backoff.go` and `pkg/strategies/exponential.go`
+- **Define Deprecation Path**: Create clear migration timeline for legacy exponential backoff scheduler
+- **Update Documentation**: Clarify relationship between legacy and new implementations
+
+### **Priority 3: Technical Debt Resolution (2-3 weeks)**
+**Timeline**: 2-4 weeks
+**Effort**: 24-40 hours
+
+#### TODO/FIXME Resolution
+- **Implement Pending TODOs**:
+  - `pkg/runner/runner.go:275` - Calculate AverageResponseTime if needed
+  - `pkg/ratelimit/ratelimit.go:311` - Add coordination mechanism
+  - Multiple cron scheduler implementation TODOs
+- **Address Skipped Tests**:
+  - `pkg/executor/streaming_test.go:120` - Implement or document permanent skip reason
+- **Parameterize Hardcoded Values**:
+  - `pkg/metrics/metrics.go` - Make Prometheus version configurable
+
+#### Interface Standardization
+- **Create Shared Interfaces Package**:
+  ```go
+  // pkg/interfaces/scheduler.go
+  package interfaces
+  
+  type Scheduler interface {
+      Next() <-chan time.Time
+      Stop()
+  }
+  
+  type Strategy interface {
+      Name() string
+      NextDelay(attempt int, lastDuration time.Duration) time.Duration
+      ShouldRetry(attempt int, err error, output string) bool
+      ValidateConfig(config *StrategyConfig) error
+  }
+  ```
+- **Update Import References**: Migrate all packages to use centralized interfaces
+- **Deprecate Duplicate Definitions**: Remove redundant interface declarations
+
+### **Priority 4: Architecture Optimization (1 month)**
+**Timeline**: 3-6 weeks
+**Effort**: 40-80 hours
+
+#### Scheduler Architecture Consolidation
+- **Legacy Scheduler Migration**: Provide clear upgrade path from ExponentialBackoffScheduler to ExponentialStrategy
+- **Interface Unification**: Ensure all scheduler types implement consistent interfaces
+- **Performance Optimization**: Profile and optimize scheduler switching and execution paths
+
+#### Plugin System Enhancement
+- **Interface Standardization**: Align plugin interfaces with core scheduler interfaces
+- **Documentation Updates**: Update plugin development guides for new interface standards
+- **Backward Compatibility**: Ensure existing plugins continue working during transition
+
+### **Quality Metrics Targets**
+- **Test Coverage**: Maintain 94.7%+ coverage during refactoring
+- **Performance**: No regression in <1% timing accuracy
+- **Compatibility**: Zero breaking changes for end users
+- **Documentation**: 100% API documentation coverage
+
+### **Expected Benefits of v0.4.2 Maintenance**
+- **Developer Experience**: Improved code organization and reduced complexity
+- **Maintainability**: Cleaner interfaces and reduced duplication
+- **Future-Proofing**: Better foundation for advanced features
+- **Code Quality**: Resolution of technical debt and consistency issues
+- **Performance**: Optimized architecture and reduced overhead
+- **Community Contribution**: Easier onboarding for external contributors
+
 ## 🚀 Future Enhancement Opportunities (Optional)
 
-After v1.0.0 CLI refactor completion, these potential enhancements could be considered for future development based on user needs:
+After completing immediate maintenance items (v0.4.2), these potential enhancements could be considered for future development based on user needs:
 
 ### Phase 1: Extended Observability (Low Priority)
 **Timeline**: 2-3 weeks
@@ -301,24 +412,34 @@ After v1.0.0 CLI refactor completion, these potential enhancements could be cons
 
 ## 🎯 Implementation Priorities
 
-### Priority 1: Maintenance & Stability (Ongoing)
+### Priority 1: Immediate Maintenance (v0.4.2)
+**Status**: Identified, Ready for Implementation
+**Timeline**: 1-2 weeks
+- **Critical Fixes**: Version consistency, interface consolidation, file cleanup
+- **Code Quality**: CLI parser refactoring, legacy code cleanup
+- **Technical Debt**: TODO resolution, interface standardization
+- **Architecture**: Scheduler consolidation, plugin system alignment
+
+### Priority 2: Maintenance & Stability (Ongoing)
 - Bug fixes and reliability improvements
 - Documentation updates and examples
-- Performance optimization
-- Security updates
-- Community support
+- Performance optimization and monitoring
+- Security updates and vulnerability management
+- Community support and issue resolution
 
-### Priority 2: Ecosystem Growth (If Demand Exists)
-- Plugin development support
+### Priority 3: Ecosystem Growth (If Demand Exists)
+- Plugin development support and SDK
 - Integration guides and templates
 - Community contribution tools
-- Performance benchmarking tools
+- Performance benchmarking and profiling tools
+- Third-party integration examples
 
-### Priority 3: Advanced Features (Based on User Feedback)
+### Priority 4: Advanced Features (Based on User Feedback)
 - Enhanced observability features
-- Advanced plugin types
-- Distributed coordination
+- Advanced plugin types and marketplace
+- Distributed coordination capabilities
 - Experimental scheduling algorithms
+- Enterprise features and compliance
 
 ## 🔄 Feature Request Process
 
