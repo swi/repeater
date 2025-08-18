@@ -62,7 +62,7 @@ quality-gate: lint test test-cron test-plugin test-integration benchmark
 lint:
 	@echo "🔧 Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run; \
+		golangci-lint run --timeout 60s; \
 	else \
 		echo "⚠️  golangci-lint not found, running go vet..."; \
 		$(GOCMD) vet ./...; \
@@ -88,7 +88,7 @@ install-tools:
 	$(GOCMD) install golang.org/x/tools/cmd/goimports@latest
 	@echo "📦 Installing golangci-lint..."
 	@if ! command -v golangci-lint >/dev/null 2>&1; then \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.54.2; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest; \
 	fi
 	@echo "✅ Development tools installed"
 

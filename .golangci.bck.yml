@@ -1,23 +1,22 @@
-version: "2"
-
 run:
+  timeout: 5m
   tests: true
 
 linters:
   enable:
     - errcheck
+    - gosimple
     - govet
     - ineffassign
     - staticcheck
+    - typecheck
     - unused
+    - gofmt
     - misspell
 
-formatters:
-  enable:
-    - gofmt
-  settings:
-    gofmt:
-      simplify: true
+linters-settings:
+  gofmt:
+    simplify: true
 
 issues:
   max-issues-per-linter: 0
