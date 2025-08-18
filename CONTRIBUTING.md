@@ -30,6 +30,46 @@ This project follows **Test-Driven Development (TDD)** methodology. **NEVER writ
 4. **Follow TDD workflow**: Red-Green-Refactor cycles
 5. **Use commit proposals**: All commits require manual approval
 
+## Development Environment
+
+### Required Tools
+
+**Core Requirements:**
+- **Go 1.22+**: Language runtime
+- **golangci-lint v2.x**: Code linting (`go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`)
+- **goimports**: Import management (`go install golang.org/x/tools/cmd/goimports@latest`)
+
+**Installation:**
+```bash
+# Install all development tools
+make install-tools
+
+# Manual installation if needed
+go install golang.org/x/tools/cmd/goimports@latest
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+```
+
+**Tool Verification:**
+```bash
+# Check if tools are properly installed
+golangci-lint version  # Should show v2.x
+goimports -version     # Should show help text
+go version            # Should show 1.22+
+```
+
+**Note**: If `goimports` shows "command not found", ensure `$(go env GOPATH)/bin` is in your PATH:
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
+### Quality Gates
+
+**Pre-commit checks automatically run:**
+- Code formatting via `go fmt` and `goimports`
+- Linting via `golangci-lint run` (must pass with 0 issues)
+- Full test suite via `go test ./...` (all tests must pass)
+- TDD compliance validation
+
 ### TDD Requirements (MANDATORY)
 
 **NEVER write implementation code without tests first. Follow this exact sequence:**
