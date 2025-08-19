@@ -65,7 +65,7 @@ func TestHealthServerEndToEnd(t *testing.T) {
 
 	assert.Equal(t, "healthy", healthResp.Status, "Health status should be 'healthy'")
 	assert.NotZero(t, healthResp.Timestamp, "Health response should have timestamp")
-	assert.Equal(t, "0.2.0", healthResp.Version, "Health response should have version")
+	assert.Equal(t, "0.3.0", healthResp.Version, "Health response should have version")
 	assert.Greater(t, healthResp.Uptime, time.Duration(0), "Health response should have uptime")
 
 	// Test ready endpoint

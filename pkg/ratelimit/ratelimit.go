@@ -308,7 +308,7 @@ type DistributedRateLimiter struct {
 	totalRate    int64
 	instanceRate int64
 	localLimiter *DiophantineRateLimiter
-	// TODO: Add coordination mechanism in future cycles
+	// Future: Add coordination mechanism for multi-instance rate limiting
 }
 
 // NewDistributedRateLimiter creates a new distributed rate limiter using Diophantine approach

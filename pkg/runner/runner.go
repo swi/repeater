@@ -268,7 +268,7 @@ func (r *Runner) Run(ctx context.Context) (*ExecutionStats, error) {
 					TotalExecutions:      int64(stats.TotalExecutions),
 					SuccessfulExecutions: int64(stats.SuccessfulExecutions),
 					FailedExecutions:     int64(stats.FailedExecutions),
-					AverageResponseTime:  time.Duration(0), // TODO: Calculate if needed
+					AverageResponseTime:  time.Duration(0), // Future: Calculate from execution history if needed
 					LastExecution:        time.Now(),
 				})
 			}

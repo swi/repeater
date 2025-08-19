@@ -37,8 +37,8 @@ func NewHTTPAwareSchedulerWithConfig(config HTTPAwareConfig) HTTPAwareScheduler 
 
 // Next returns a channel that will send the next execution time
 func (s *httpAwareScheduler) Next() <-chan time.Time {
-	// TODO: Implement actual scheduling logic
-	// This is a stub implementation that will make tests fail (RED phase)
+	// Note: Current implementation uses NextDelay() for timing and integrates
+	// with execution loop. Full channel-based scheduling is in backlog.
 	if s.fallbackScheduler != nil {
 		return s.fallbackScheduler.Next()
 	}

@@ -201,6 +201,107 @@ func TestConfigLoad_NonexistentFile(t *testing.T) {
 	}
 }
 
+func TestConfigLoad_EnvironmentVariableErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		envVar string
+		value  string
+	}{
+		{"invalid_timeout", "RPR_TIMEOUT", "invalid"},
+		{"invalid_max_retries", "RPR_MAX_RETRIES", "not_a_number"},
+		{"invalid_default_interval", "RPR_DEFAULT_INTERVAL", "invalid_duration"},
+		{"invalid_jitter_percent", "RPR_JITTER_PERCENT", "not_a_float"},
+		{"invalid_metrics_enabled", "RPR_METRICS_ENABLED", "not_a_bool"},
+		{"invalid_metrics_port", "RPR_METRICS_PORT", "not_a_number"},
+		{"invalid_health_check_port", "RPR_HEALTH_CHECK_PORT", "not_a_number"},
+		{"invalid_health_enabled", "RPR_HEALTH_ENABLED", "not_a_bool"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set invalid environment variable
+			_ = os.Setenv(tt.envVar, tt.value)
+			defer func() {
+				_ = os.Unsetenv(tt.envVar)
+			}()
+
+			// Should return error for invalid env var
+			_, err := LoadConfig("")
+			if err == nil {
+				t.Errorf("Expected error for invalid %s value '%s', got nil", tt.envVar, tt.value)
+			}
+		})
+	}
+}
+
+func TestConfigLoad_AllEnvironmentVariables(t *testing.T) {
+	// Set all supported environment variables
+	envVars := map[string]string{
+		"RPR_TIMEOUT":           "45s",
+		"RPR_MAX_RETRIES":       "7",
+		"RPR_LOG_LEVEL":         "warn",
+		"RPR_DEFAULT_INTERVAL":  "15s",
+		"RPR_JITTER_PERCENT":    "10.5",
+		"RPR_METRICS_ENABLED":   "true",
+		"RPR_METRICS_PORT":      "9092",
+		"RPR_HEALTH_CHECK_PORT": "8081",
+		"RPR_HEALTH_ENABLED":    "true",
+	}
+
+	// Set all environment variables
+	for key, value := range envVars {
+		_ = os.Setenv(key, value)
+	}
+	defer func() {
+		for key := range envVars {
+			_ = os.Unsetenv(key)
+		}
+	}()
+
+	// Load config - all environment variables should be applied
+	config, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("Expected no error loading config, got: %v", err)
+	}
+
+	// Verify all environment overrides took effect
+	if config.Defaults.Timeout != 45*time.Second {
+		t.Errorf("Expected timeout 45s (from env), got %v", config.Defaults.Timeout)
+	}
+
+	if config.Defaults.MaxRetries != 7 {
+		t.Errorf("Expected max_retries 7 (from env), got %d", config.Defaults.MaxRetries)
+	}
+
+	if config.Defaults.LogLevel != "warn" {
+		t.Errorf("Expected log_level 'warn' (from env), got %s", config.Defaults.LogLevel)
+	}
+
+	if config.Scheduling.DefaultInterval != 15*time.Second {
+		t.Errorf("Expected default_interval 15s (from env), got %v", config.Scheduling.DefaultInterval)
+	}
+
+	if config.Scheduling.JitterPercent != 10.5 {
+		t.Errorf("Expected jitter_percent 10.5 (from env), got %f", config.Scheduling.JitterPercent)
+	}
+
+	if !config.Observability.MetricsEnabled {
+		t.Error("Expected metrics_enabled true (from env), got false")
+	}
+
+	if config.Observability.MetricsPort != 9092 {
+		t.Errorf("Expected metrics_port 9092 (from env), got %d", config.Observability.MetricsPort)
+	}
+
+	if config.Observability.HealthCheckPort != 8081 {
+		t.Errorf("Expected health_check_port 8081 (from env), got %d", config.Observability.HealthCheckPort)
+	}
+
+	if !config.Observability.HealthEnabled {
+		t.Error("Expected health_enabled true (from env), got false")
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	tests := []struct {
 		name        string
