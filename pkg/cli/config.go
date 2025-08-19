@@ -9,14 +9,15 @@ import (
 
 // Config represents the parsed CLI configuration
 type Config struct {
-	Subcommand string
-	Every      time.Duration
-	Times      int64
-	For        time.Duration
-	Command    []string
-	Help       bool
-	Version    bool
-	ConfigFile string
+	Subcommand     string
+	Every          time.Duration
+	Times          int64
+	For            time.Duration
+	Command        []string
+	Help           bool
+	SubcommandHelp bool // help for specific subcommand
+	Version        bool
+	ConfigFile     string
 
 	// Rate limiting fields
 	RateSpec     string // e.g., "10/1h", "100/1m"

@@ -131,7 +131,7 @@ This document outlines current features, completed development cycles, immediate
 ### v0.5.1 - Technical Debt Remediation (January 19, 2025) 🔧 **PLANNED**
 - **Test Coverage Enhancement**: Raise coverage from 72.5% to 85%+ across all packages
 - **Code Organization**: Refactor large files and reduce complexity in critical packages
-- **TODO Resolution**: Complete all 10 TODO items and remove hardcoded values
+- **TODO Resolution**: Complete all 7 TODO items and remove hardcoded values
 - **Documentation Validation**: Ensure all examples work and version consistency
 - **Performance Optimization**: Add comprehensive benchmarks and memory profiling
 - **Quality Gates**: Achieve A+ grade (95+/100) with zero technical debt
@@ -429,7 +429,7 @@ After completing immediate maintenance items (v0.4.2), these potential enhanceme
   - **Estimated**: 8 hours, 15+ new test functions
 
 - **`pkg/cli` (57.7% → 85%+)**:
-  - Add validation.go comprehensive tests (457 lines, largest file)
+  - Add validation.go comprehensive tests (451 lines, largest file)
   - Add parser.go edge case testing
   - Add flags.go parameter validation tests
   - **Estimated**: 6 hours, 12+ new test functions
@@ -461,7 +461,7 @@ After completing immediate maintenance items (v0.4.2), these potential enhanceme
   - Separate health monitoring to health_monitor.go
   - **Estimated**: 5 hours
 
-- **`pkg/cli/validation.go` (457 lines)**:
+- **`pkg/cli/validation.go` (451 lines)**:
   - Split parameter validation into strategy_validator.go
   - Extract common validation to base_validator.go
   - **Estimated**: 2 hours
@@ -469,7 +469,7 @@ After completing immediate maintenance items (v0.4.2), these potential enhanceme
 #### Phase 3: TODO Resolution & Maintenance (Priority 3) - 12 hours
 **Target**: Complete all deferred implementations and maintenance
 
-##### **TODO Item Resolution (10 items)**
+##### **TODO Item Resolution (7 items)**
 - **`pkg/httpaware/scheduler.go:40`**: Implement actual scheduling logic (4 hours)
 - **`pkg/runner/health_integration_test.go:99`**: Complete health server integration (2 hours)
 - **`pkg/runner/metrics_integration_test.go:99`**: Complete metrics server integration (2 hours)
@@ -502,7 +502,7 @@ After completing immediate maintenance items (v0.4.2), these potential enhanceme
 ### **🎯 Success Criteria for v0.5.1**
 - ✅ **Test Coverage**: 85%+ across all packages (current: 72.5%)
 - ✅ **Code Complexity**: No files >600 lines (current: 3 files >600 lines)
-- ✅ **TODO Resolution**: 0 TODO items (current: 10 items)
+- ✅ **TODO Resolution**: 0 TODO items (current: 7 items)
 - ✅ **Performance**: Memory benchmarks for all critical paths
 - ✅ **Quality Grade**: A+ (95+/100) (current: A- 91.7/100)
 - ✅ **Documentation**: 100% working examples, version consistency

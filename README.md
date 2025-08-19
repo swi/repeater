@@ -2,7 +2,7 @@
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/swi/repeater)
 [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/swi/repeater)
-[![Version](https://img.shields.io/badge/version-v0.3.0-blue)](https://github.com/swi/repeater/releases)
+[![Version](https://img.shields.io/badge/version-v0.5.0-blue)](https://github.com/swi/repeater/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A CLI tool for continuous, scheduled command execution with intelligent timing, Unix pipeline integration, and advanced scheduling capabilities.
@@ -114,7 +114,7 @@ rpr i -e 5s -t 10 --stats-only -- ./performance-test.sh
 
 ## Status: Production Ready ✅
 
-**Current Version**: v0.3.0 (Advanced Features Complete)
+**Current Version**: v0.5.0 (Production Ready - Excellent Quality)
 
 ### Fully Implemented & Tested
 - ✅ **Complete CLI** with multi-level abbreviations and intuitive UX

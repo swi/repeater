@@ -18,6 +18,9 @@ func (p *argParser) parseSubcommandFlags() error {
 		}
 
 		switch arg {
+		case "--help", "-h":
+			p.config.SubcommandHelp = true
+			return nil
 		case "--every", "-e":
 			if err := p.parseDurationFlag(&p.config.Every); err != nil {
 				return err

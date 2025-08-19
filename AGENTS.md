@@ -1,6 +1,6 @@
 # Repeater Development Guide - Agent Instructions
 
-## 🎉 Project Status: **PRODUCTION READY (v0.3.0)**
+## 🎉 Project Status: **PRODUCTION READY (v0.5.0)**
 
 This is a Go-based CLI tool for continuous command execution with intelligent scheduling and monitoring capabilities. **The project is feature-complete and production-ready** with all core features implemented and thoroughly tested.
 
@@ -179,16 +179,16 @@ git commit -m "docs: restructure documentation for clarity and eliminate duplica
 - Archive duplicate files: PROJECT_STRUCTURE.md, IMPLEMENTATION_PLANNING.md, 
   ADVANCED_FEATURES_PLAN.md, examples/USAGE_EXAMPLES.md, project-status/
 - Eliminate 80%+ content duplication across 20 files → 6 focused files
-- Standardize version references to v0.3.0 throughout
+- Standardize version references to v0.5.0 throughout
 - Implement mandatory documentation sync requirements
 
 Documentation-Restructure: 20-files → 6-files
 Content-Duplication: Eliminated
-Version-Consistency: v0.3.0 standardized
+Version-Consistency: v0.5.0 standardized
 Enforcement-Rules: Added to AGENTS.md and CONTRIBUTING.md"
 ```
 
-## 🎯 **Available Features (v0.3.0)**
+## 🎯 **Available Features (v0.5.0)**
 
 ### **CLI Commands**
 - **CLI with Abbreviations**: `rpr i -e 30s -t 5 -- curl api.com`

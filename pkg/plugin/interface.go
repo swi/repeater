@@ -18,16 +18,17 @@ type SchedulerPlugin interface {
 	Description() string
 
 	// Configuration management
-	ValidateConfig(config map[string]interface{}) error
+	ValidateConfig(config map[string]any) error
 	ConfigSchema() *ConfigSchema
 
 	// Scheduler creation
-	Create(config map[string]interface{}) (Scheduler, error)
+	Create(config map[string]any) (Scheduler, error)
 }
 
 // ExecutorPlugin interface defines the contract for executor plugins
 type ExecutorPlugin interface {
 	Name() string
+	ValidateConfig(config map[string]any) error
 	Execute(ctx context.Context, cmd []string, opts ExecutorOptions) (*ExecutionResult, error)
 	SupportsStreaming() bool
 	SupportedPlatforms() []string
@@ -36,6 +37,7 @@ type ExecutorPlugin interface {
 // OutputPlugin interface defines the contract for output plugins
 type OutputPlugin interface {
 	Name() string
+	ValidateConfig(config map[string]any) error
 	ProcessOutput(result *ExecutionResult, config OutputConfig) error
 	SupportsStreaming() bool
 	RequiredConfig() []string
@@ -70,7 +72,7 @@ type ConfigField struct {
 	Name        string      `json:"name"`
 	Type        string      `json:"type"` // "string", "int", "duration", "bool"
 	Required    bool        `json:"required"`
-	Default     interface{} `json:"default,omitempty"`
+	Default     any         `json:"default,omitempty"`
 	Description string      `json:"description"`
 	Validation  *Validation `json:"validation,omitempty"`
 }

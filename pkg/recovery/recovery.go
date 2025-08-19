@@ -917,7 +917,7 @@ func (er *ErrorReporter) logErrorText(err *rprErrors.CategorizedError) {
 
 // logErrorJSON logs an error in JSON format
 func (er *ErrorReporter) logErrorJSON(err *rprErrors.CategorizedError) {
-	logEntry := map[string]interface{}{
+	logEntry := map[string]any{
 		"timestamp": err.Timestamp().Format(time.RFC3339),
 		"message":   err.Error(),
 		"category":  err.Category().String(),

@@ -13,7 +13,7 @@ import (
 
 // ValidateConfig validates the parsed configuration
 func ValidateConfig(config *Config) error {
-	if config.Help || config.Version {
+	if config.Help || config.Version || config.SubcommandHelp {
 		return nil // Help and version don't need validation
 	}
 
