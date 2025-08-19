@@ -66,9 +66,7 @@ func (s *httpAwareScheduler) SetLastResponse(response string) {
 		delay := timingInfo.Delay
 
 		// Apply minimum delay
-		if delay < s.config.MinDelay {
-			delay = s.config.MinDelay
-		}
+		delay = max(delay, s.config.MinDelay)
 
 		// Apply maximum delay cap
 		if s.config.MaxDelay > 0 && delay > s.config.MaxDelay {

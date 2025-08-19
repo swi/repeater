@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -163,14 +164,7 @@ func applyEnvironmentOverrides(config *Config) error {
 func (c *Config) Validate() error {
 	// Validate log level
 	validLogLevels := []string{"debug", "info", "warn", "error"}
-	validLevel := false
-	for _, level := range validLogLevels {
-		if strings.ToLower(c.Defaults.LogLevel) == level {
-			validLevel = true
-			break
-		}
-	}
-	if !validLevel {
+	if !slices.Contains(validLogLevels, strings.ToLower(c.Defaults.LogLevel)) {
 		return fmt.Errorf("invalid log level '%s', must be one of: %v", c.Defaults.LogLevel, validLogLevels)
 	}
 

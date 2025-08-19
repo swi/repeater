@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -284,14 +285,7 @@ func validateCronConfig(config *Config) error {
 	if strings.HasPrefix(expr, "@") {
 		// Shortcut format
 		validShortcuts := []string{"@yearly", "@annually", "@monthly", "@weekly", "@daily", "@hourly"}
-		valid := false
-		for _, shortcut := range validShortcuts {
-			if expr == shortcut {
-				valid = true
-				break
-			}
-		}
-		if !valid {
+		if !slices.Contains(validShortcuts, expr) {
 			return fmt.Errorf("invalid cron shortcut: %s (valid shortcuts: %s)", expr, strings.Join(validShortcuts, ", "))
 		}
 	} else {
