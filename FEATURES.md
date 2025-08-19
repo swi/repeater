@@ -128,6 +128,14 @@ This document outlines current features, completed development cycles, immediate
 - **Architecture Modernization**: Clean separation between operational modes and mathematical strategies
 - **Quality Validation**: Comprehensive codebase analysis achieving A- grade (91.7/100)
 
+### v0.5.1 - Technical Debt Remediation (January 19, 2025) 🔧 **PLANNED**
+- **Test Coverage Enhancement**: Raise coverage from 72.5% to 85%+ across all packages
+- **Code Organization**: Refactor large files and reduce complexity in critical packages
+- **TODO Resolution**: Complete all 10 TODO items and remove hardcoded values
+- **Documentation Validation**: Ensure all examples work and version consistency
+- **Performance Optimization**: Add comprehensive benchmarks and memory profiling
+- **Quality Gates**: Achieve A+ grade (95+/100) with zero technical debt
+
 ## ✅ Completed Major Refactor: CLI Strategy Interface (v0.4.0)
 
 **Status**: 100% Complete - Production Ready
@@ -405,13 +413,131 @@ After completing immediate maintenance items (v0.4.2), these potential enhanceme
 
 ## 🎯 Implementation Priorities
 
-### Priority 1: Immediate Maintenance (v0.4.2)
-**Status**: Identified, Ready for Implementation
-**Timeline**: 1-2 weeks
-- **Critical Fixes**: Version consistency, interface consolidation, file cleanup
-- **Code Quality**: CLI parser refactoring, legacy code cleanup
-- **Technical Debt**: TODO resolution, interface standardization
-- **Architecture**: Scheduler consolidation, plugin system alignment
+### Priority 1: Technical Debt Remediation (v0.5.1) 🔧 **NEXT PHASE**
+**Status**: Planned for Implementation
+**Timeline**: 2-3 weeks (40-60 hours)
+**Target**: Achieve A+ grade (95+/100) with zero technical debt
+
+#### Phase 1: Test Coverage Enhancement (Priority 1) - 20 hours
+**Target**: Raise coverage from 72.5% to 85%+ across all packages
+
+##### **Coverage Critical Gaps**
+- **`cmd/rpr` (16.0% → 75%+)**:
+  - Add main.go integration tests (CLI argument parsing, exit codes)
+  - Add config.go tests (TOML parsing, environment variables)
+  - Add config_integration_test.go comprehensive scenarios
+  - **Estimated**: 8 hours, 15+ new test functions
+
+- **`pkg/cli` (57.7% → 85%+)**:
+  - Add validation.go comprehensive tests (457 lines, largest file)
+  - Add parser.go edge case testing
+  - Add flags.go parameter validation tests
+  - **Estimated**: 6 hours, 12+ new test functions
+
+- **`pkg/runner` (52.7% → 85%+)**:
+  - Add runner.go execution path tests (822 lines, second largest)
+  - Add metrics integration real scenarios
+  - Add health integration comprehensive tests
+  - **Estimated**: 4 hours, 8+ new test functions
+
+- **`pkg/scheduler` (65.2% → 85%+)**:
+  - Complete cron.go TODO implementations
+  - Add loadaware.go stress testing
+  - Add strategy.go interface tests
+  - **Estimated**: 2 hours, 4+ new test functions
+
+#### Phase 2: Code Organization & Complexity Reduction (Priority 2) - 15 hours
+**Target**: Reduce complexity and improve maintainability
+
+##### **Large File Refactoring**
+- **`pkg/recovery/recovery.go` (1,010 lines)**:
+  - Split into focused modules: circuit_breaker.go, retry_policy.go, error_handler.go
+  - Extract error categorization into separate package
+  - **Estimated**: 8 hours
+
+- **`pkg/runner/runner.go` (822 lines)**:
+  - Extract execution engine into executor_runner.go
+  - Move metrics collection to metrics_collector.go
+  - Separate health monitoring to health_monitor.go
+  - **Estimated**: 5 hours
+
+- **`pkg/cli/validation.go` (457 lines)**:
+  - Split parameter validation into strategy_validator.go
+  - Extract common validation to base_validator.go
+  - **Estimated**: 2 hours
+
+#### Phase 3: TODO Resolution & Maintenance (Priority 3) - 12 hours
+**Target**: Complete all deferred implementations and maintenance
+
+##### **TODO Item Resolution (10 items)**
+- **`pkg/httpaware/scheduler.go:40`**: Implement actual scheduling logic (4 hours)
+- **`pkg/runner/health_integration_test.go:99`**: Complete health server integration (2 hours)
+- **`pkg/runner/metrics_integration_test.go:99`**: Complete metrics server integration (2 hours)
+- **`pkg/scheduler/cron_test.go`**: Complete 6 TODO implementations (3 hours)
+- **`pkg/health/health.go:127`**: Dynamic version from build info (1 hour)
+
+##### **Version Consistency Fix**
+- Fix hardcoded version in health.go:127
+- Ensure all documentation references v0.5.1
+- Validate version consistency across all files
+
+#### Phase 4: Performance & Quality Optimization (Priority 4) - 8 hours
+**Target**: Optimize performance and add comprehensive monitoring
+
+##### **Performance Enhancements**
+- **Memory Profiling**: Add benchmark tests for long-running operations (2 hours)
+- **Parallel Testing**: Add `t.Parallel()` to all suitable tests (2 hours)
+- **Load Testing**: Stress testing for extended execution scenarios (2 hours)
+- **Resource Optimization**: Enhanced cleanup and memory management (2 hours)
+
+#### Phase 5: Documentation & Validation (Priority 5) - 5 hours
+**Target**: Ensure documentation accuracy and consistency
+
+##### **Documentation Validation**
+- Test ALL CLI examples in USAGE.md for accuracy (2 hours)
+- Verify version consistency across all 6 documentation files (1 hour)
+- Update ARCHITECTURE.md with any structural changes (1 hour)
+- Validate links and references across documentation (1 hour)
+
+### **🎯 Success Criteria for v0.5.1**
+- ✅ **Test Coverage**: 85%+ across all packages (current: 72.5%)
+- ✅ **Code Complexity**: No files >600 lines (current: 3 files >600 lines)
+- ✅ **TODO Resolution**: 0 TODO items (current: 10 items)
+- ✅ **Performance**: Memory benchmarks for all critical paths
+- ✅ **Quality Grade**: A+ (95+/100) (current: A- 91.7/100)
+- ✅ **Documentation**: 100% working examples, version consistency
+
+### **📊 Implementation Timeline**
+```
+Week 1 (20h): Test Coverage Enhancement
+├── Days 1-2: cmd/rpr comprehensive testing (8h)
+├── Days 3-4: pkg/cli validation testing (6h)  
+├── Days 5: pkg/runner execution testing (4h)
+└── Weekend: pkg/scheduler completion (2h)
+
+Week 2 (20h): Code Organization & TODO Resolution  
+├── Days 1-2: recovery.go refactoring (8h)
+├── Days 3: runner.go modularization (5h)
+├── Day 4: validation.go splitting (2h)
+└── Day 5: Critical TODO implementations (5h)
+
+Week 3 (15h): Performance & Documentation
+├── Days 1-2: Performance optimization (8h)
+├── Days 3-4: Documentation validation (4h)
+└── Day 5: Final quality validation (3h)
+```
+
+### **🔄 Quality Gates (Must Pass Before v0.5.1)**
+```bash
+# MANDATORY before any commit
+make quality-gate              # All quality checks pass
+go test -cover ./...          # 85%+ coverage achieved
+make benchmark               # Performance benchmarks pass
+make docs-check              # Documentation consistency verified
+golangci-lint run            # Zero linting issues maintained
+```
+
+### Priority 2: Maintenance & Stability (Ongoing)
 
 ### Priority 2: Maintenance & Stability (Ongoing)
 - Bug fixes and reliability improvements
