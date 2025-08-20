@@ -42,12 +42,12 @@ test-plugin:
 ## Run integration tests
 test-integration:
 	@echo "🔗 Running integration tests..."
-	$(GOTEST) -v -tags=integration ./tests/integration/...
+	$(GOTEST) -v -run=".*[Ii]ntegration.*" ./cmd/... ./pkg/...
 
 ## Run end-to-end tests
 test-e2e:
 	@echo "🎯 Running end-to-end tests..."
-	$(GOTEST) -v -tags=e2e -timeout=10m ./tests/e2e/...
+	$(GOTEST) -v -run=".*([Ee]2[Ee]|EndToEnd).*" -timeout=10m ./cmd/... ./pkg/...
 
 ## Run performance benchmarks
 benchmark:
