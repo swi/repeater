@@ -17,7 +17,7 @@ type StrategyScheduler struct {
 	nextChan       chan time.Time
 	stopChan       chan struct{}
 	stopped        bool
-	mu             sync.RWMutex // Protects stopped field
+	mu             sync.RWMutex // Protects stopped and currentAttempt fields
 	stopOnce       sync.Once    // Ensures Stop() is idempotent
 }
 
@@ -49,21 +49,25 @@ func (s *StrategyScheduler) Next() <-chan time.Time {
 	s.mu.RUnlock()
 
 	go func() {
+		// Safely increment attempt counter
+		s.mu.Lock()
 		s.currentAttempt++
+		currentAttempt := s.currentAttempt
+		s.mu.Unlock()
 
 		// Check if we've exceeded max attempts
-		if s.maxAttempts > 0 && s.currentAttempt > s.maxAttempts {
+		if s.maxAttempts > 0 && currentAttempt > s.maxAttempts {
 			s.Stop()
 			return
 		}
 
 		var delay time.Duration
-		if s.currentAttempt == 1 {
+		if currentAttempt == 1 {
 			// First attempt - execute immediately
 			delay = 0
 		} else {
 			// Calculate retry delay using the strategy
-			delay = s.strategy.NextDelay(s.currentAttempt-1, s.lastDuration)
+			delay = s.strategy.NextDelay(currentAttempt-1, s.lastDuration)
 		}
 
 		// Schedule the next execution
@@ -134,6 +138,8 @@ func (s *StrategyScheduler) IsRetryMode() bool {
 
 // GetAttemptNumber returns the current attempt number
 func (s *StrategyScheduler) GetAttemptNumber() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.currentAttempt
 }
 
