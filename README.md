@@ -1,37 +1,36 @@
-# Repeater (rpr) - Unix Pipeline-Friendly Command Execution Tool
+# Repeater (rpr) - A Command Execution Tool
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/swi/repeater)
 [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/swi/repeater)
-[![Version](https://img.shields.io/badge/version-v0.5.0-blue)](https://github.com/swi/repeater/releases)
+[![Version](https://img.shields.io/badge/version-v0.5.1-blue)](https://github.com/swi/repeater/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A CLI tool for continuous, scheduled command execution with intelligent timing, Unix pipeline integration, and advanced scheduling capabilities.
 
 ## Overview
 
-Repeater executes commands repeatedly with sophisticated scheduling algorithms, making it perfect for monitoring, testing, data processing, and automation workflows. Unlike simple tools like `watch` or `cron`, repeater provides intelligent timing, rate limiting, pattern matching, and seamless Unix pipeline integration.
+Repeater executes commands repeatedly with helpful scheduling algorithms, making it good for monitoring, testing, data processing, and automation workflows. Unlike simpler tools, like `watch` or `cron`, repeater provides intelligent timing, rate limiting, and pattern matching.
 
 ## Key Features
 
-- **Unix Pipeline Integration**: Clean output, proper exit codes, real-time streaming
 - **8 Scheduling Modes**: interval, count, duration, cron, adaptive, backoff, load-aware, rate-limit
 - **Pattern Matching**: Success/failure detection via regex patterns with precedence rules
 - **HTTP-Aware Intelligence**: Automatic API response parsing for optimal scheduling
 - **Plugin System**: Extensible architecture for custom schedulers and executors
 - **Multi-level Abbreviations**: Power user shortcuts (`rpr i -e 30s -t 5 -- curl api.com`)
-- **Production Ready**: Signal handling, metrics, health endpoints, comprehensive error recovery
+- **Unix Pipeline Integration**: Clean output, proper exit codes, real-time streaming
 
 ## Quick Start
 
 ### Installation
 ```bash
+# Or install directly
+go install github.com/swi/repeater/cmd/rpr@latest
+
 # Build from source
 git clone https://github.com/swi/repeater
 cd repeater
 go build -o rpr ./cmd/rpr
-
-# Or install directly
-go install github.com/swi/repeater/cmd/rpr@latest
 ```
 
 ### Basic Usage
@@ -181,5 +180,3 @@ Repeater follows Unix conventions for scripting integration:
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-
-**Ready for immediate production deployment with comprehensive documentation and testing!** 🚀

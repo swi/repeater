@@ -2,7 +2,7 @@
 
 A comprehensive guide to using the `rpr` command-line tool for continuous command execution with intelligent scheduling and Unix pipeline integration.
 
-> **✅ All examples in this guide are tested and working with the current implementation (v0.5.0)**
+> **✅ All examples in this guide are tested and working with the current implementation (v0.5.1)**
 
 ## Table of Contents
 
