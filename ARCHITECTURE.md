@@ -4,6 +4,8 @@
 
 Repeater is designed as a comprehensive, extensible Go application with advanced scheduling capabilities, plugin system, and production-ready features. The architecture emphasizes modularity, testability, performance, and extensibility for continuous execution scenarios.
 
+> 📖 **User Perspective:** For practical usage examples of these architectural components, see the [Usage Guide](USAGE.md). For contributing to this architecture, see [Contributing Guidelines](CONTRIBUTING.md#key-architecture-patterns).
+
 ## High-Level Architecture
 
 ```
@@ -190,6 +192,8 @@ func (pm *PatternMatcher) EvaluateResult(result *ExecutionResult) PatternResult 
 
 **Responsibility**: Parse HTTP responses to extract timing information for optimal API scheduling.
 
+> 📖 **Usage Examples:** See [HTTP-Aware Intelligence](USAGE.md#http-aware-intelligence) in the Usage Guide for practical configuration and real-world API examples
+
 ```go
 type HTTPAwareParser struct {
     maxDelay        time.Duration
@@ -226,6 +230,8 @@ func (p *HTTPAwareParser) ParseTiming(response *http.Response, body []byte) *Tim
 ### 6. Plugin System (`pkg/plugin`)
 
 **Responsibility**: Extensible architecture for custom schedulers, executors, and outputs.
+
+> 🤝 **Plugin Development:** See [Plugin Development Guide](CONTRIBUTING.md#plugin-development) for creating custom plugins and integration examples
 
 ```go
 type SchedulerPlugin interface {
@@ -545,3 +551,17 @@ pkg/                     # Core library packages
 - **Structured Logging**: JSON logs with correlation IDs
 
 This architecture provides a robust, extensible foundation for continuous command execution with advanced scheduling capabilities and production-ready features.
+
+## See Also
+
+### Related Documentation
+- 📖 **[README.md](README.md)** - Project overview and quick start
+- 📚 **[USAGE.md](USAGE.md)** - Comprehensive usage guide with practical examples
+- 🤝 **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guidelines for contributing to this architecture
+- 📋 **[FEATURES.md](FEATURES.md)** - Implementation roadmap and technical achievements
+- 📝 **[CHANGELOG.md](CHANGELOG.md)** - Architectural evolution and version history
+
+### Implementation Examples
+- 🔧 **[Plugin Development](CONTRIBUTING.md#plugin-development)** - Extending the architecture with custom components
+- 📊 **[Performance Benchmarks](FEATURES.md#quality-metrics)** - Real-world performance metrics
+- 🧪 **[Testing Strategy](CONTRIBUTING.md#tdd-workflow-mandatory)** - Quality assurance methodology

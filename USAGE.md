@@ -6,22 +6,35 @@ A comprehensive guide to using the `rpr` command-line tool for continuous comman
 
 ## Table of Contents
 
-- [Installation](#installation)
-- [Basic Syntax](#basic-syntax)
-- [Unix Pipeline Integration](#unix-pipeline-integration)
-- [Output Modes](#output-modes)
-- [Command Abbreviations](#command-abbreviations)
-- [Core Commands](#core-commands)
-- [Advanced Scheduling](#advanced-scheduling)
-- [Pattern Matching](#pattern-matching)
-- [HTTP-Aware Intelligence](#http-aware-intelligence)
-- [Configuration](#configuration)
-- [Real-World Use Cases](#real-world-use-cases)
-- [Integration Patterns](#integration-patterns)
-- [Exit Codes for Scripting](#exit-codes-for-scripting)
-- [Performance Considerations](#performance-considerations)
-- [Troubleshooting](#troubleshooting)
-- [Tips & Best Practices](#tips--best-practices)
+### Getting Started
+- [Installation](#installation) - Build from source or install directly
+- [Basic Syntax](#basic-syntax) - Command structure and key concepts
+- [Unix Pipeline Integration](#unix-pipeline-integration) - Clean output for scripts
+
+### Basic Usage
+- [Output Modes](#output-modes) - Default, quiet, verbose, stats-only
+- [Command Abbreviations](#command-abbreviations) - Power user shortcuts
+- [Core Commands](#core-commands) - Interval, count, duration execution
+
+### Advanced Features
+- [Advanced Scheduling](#advanced-scheduling) - Cron, adaptive, mathematical strategies
+- [Pattern Matching](#pattern-matching) - Success/failure detection via regex
+- [HTTP-Aware Intelligence](#http-aware-intelligence) - Automatic API response parsing
+- [Configuration](#configuration) - TOML files and environment variables
+
+### Real-World Applications
+- [Real-World Use Cases](#real-world-use-cases) - Monitoring, testing, DevOps
+- [Integration Patterns](#integration-patterns) - CI/CD, monitoring systems
+- [Performance Considerations](#performance-considerations) - Optimization tips
+
+### Reference
+- [Exit Codes for Scripting](#exit-codes-for-scripting) - Unix-standard codes
+- [Troubleshooting](#troubleshooting) - Common issues and solutions
+- [Tips & Best Practices](#tips--best-practices) - Expert recommendations
+
+> 🏗️ **Technical Details:** See [Architecture Guide](ARCHITECTURE.md) for implementation details
+> 🤝 **Contributing:** See [Contributing Guide](CONTRIBUTING.md) for development guidelines
+> 📋 **Roadmap:** See [Features](FEATURES.md) for current status and future plans
 
 ## Installation
 
@@ -232,6 +245,8 @@ rpr adaptive --base-interval 30s --min-interval 10s --max-interval 5m -- mysql -
 rpr a -b 1s --show-metrics -- curl https://api.com
 ```
 
+> 🏗️ **Technical Details:** Learn about the [AIMD algorithm](ARCHITECTURE.md#adaptive-scheduling-algorithm) and [performance characteristics](ARCHITECTURE.md#performance-characteristics) in the Architecture Guide
+
 
 
 ### Load-Aware Scheduling
@@ -324,6 +339,8 @@ rpr duration --for 1h --every 5m --success-pattern "completed" --failure-pattern
 
 HTTP-aware intelligence automatically parses HTTP responses to extract timing information, making API monitoring significantly more efficient.
 
+> 🏗️ **Implementation Details:** See [HTTP-Aware Intelligence Architecture](ARCHITECTURE.md#http-aware-intelligence) for parsing priority and supported response formats
+
 ### Basic HTTP-Aware Scheduling
 
 ```bash
@@ -374,6 +391,8 @@ rpr i -e 1s --http-aware -- curl -H "Authorization: Bot $DISCORD_TOKEN" https://
 ### TOML Configuration Files
 
 Create configuration files to set default options:
+
+> 🏗️ **Architecture Context:** Learn about the [Configuration System](ARCHITECTURE.md#configuration-management) and how settings are loaded and prioritized
 
 ```toml
 # ~/.config/rpr/config.toml
@@ -546,9 +565,11 @@ esac
 ### Choosing Scheduling Modes
 
 - **Interval Mode**: Best for regular monitoring, predictable resource usage
-- **Adaptive Mode**: Best for variable workloads, automatically adjusts to conditions
+- **Adaptive Mode**: Best for variable workloads, automatically adjusts to conditions  
 - **Load-Adaptive Mode**: Best for resource-aware execution, scales with system resources
 - **Backoff Mode**: Best for unreliable services, reduces load on failing services
+
+> 📊 **Performance Details:** See [Performance Characteristics](ARCHITECTURE.md#performance-characteristics) for timing accuracy, resource usage, and optimization techniques
 
 ### Resource Usage Guidelines
 
@@ -580,6 +601,8 @@ rpr interval --every 1m --stats-only -- ./performance-test.sh
 ## Troubleshooting
 
 ### Common Issues
+
+> 🤝 **Need More Help?** Check the [Contributing Guide](CONTRIBUTING.md#getting-help) for development support, or see [Architecture](ARCHITECTURE.md#quality-assurance) for technical details
 
 ```bash
 # Problem: Pipeline not working as expected
@@ -678,4 +701,18 @@ rpr c -h
 rpr examples
 ```
 
-For more information and advanced usage patterns, see the project documentation at [github.com/swi/repeater](https://github.com/swi/repeater).
+## See Also
+
+### Related Documentation
+- 📖 **[README.md](README.md)** - Project overview and quick start
+- 🏗️ **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical design and implementation details
+- 🤝 **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guidelines and plugin creation
+- 📋 **[FEATURES.md](FEATURES.md)** - Feature roadmap and implementation status
+- 📝 **[CHANGELOG.md](CHANGELOG.md)** - Version history and migration guides
+
+### External Resources
+- 🌐 **[Project Repository](https://github.com/swi/repeater)** - Source code and issue tracking
+- 📦 **[Go Package](https://pkg.go.dev/github.com/swi/repeater)** - API documentation
+- 🏷️ **[Releases](https://github.com/swi/repeater/releases)** - Download binaries and release notes
+
+For more information and advanced usage patterns, visit the project repository at [github.com/swi/repeater](https://github.com/swi/repeater).

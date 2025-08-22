@@ -512,3 +512,93 @@ func TestErrorHandlingInExecution(t *testing.T) {
 		})
 	}
 }
+
+// TestParseRetryPatternDirect tests the parseRetryPattern function directly
+func TestParseRetryPatternDirect(t *testing.T) {
+	runner := &Runner{}
+
+	tests := []struct {
+		name     string
+		pattern  string
+		expected []time.Duration
+		wantErr  bool
+	}{
+		{
+			name:     "single zero",
+			pattern:  "0",
+			expected: []time.Duration{0},
+			wantErr:  false,
+		},
+		{
+			name:     "multiple durations with spaces",
+			pattern:  " 0 , 10m , 30m ",
+			expected: []time.Duration{0, 10 * time.Minute, 30 * time.Minute},
+			wantErr:  false,
+		},
+		{
+			name:    "invalid duration",
+			pattern: "0,invalid,10m",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := runner.parseRetryPattern(tt.pattern)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestCreateLoadAdaptiveSchedulerDirect tests createLoadAdaptiveScheduler function
+func TestCreateLoadAdaptiveSchedulerDirect(t *testing.T) {
+	config := &cli.Config{
+		Subcommand:   "load-adaptive",
+		BaseInterval: 1 * time.Second,
+		TargetCPU:    75.0,
+		TargetMemory: 80.0,
+		TargetLoad:   1.5,
+		MinInterval:  500 * time.Millisecond,
+		MaxInterval:  10 * time.Second,
+	}
+
+	runner := &Runner{config: config}
+	scheduler, err := runner.createLoadAdaptiveScheduler()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, scheduler)
+}
+
+// TestGetterFunctionEdgeCases tests the getter functions for default values
+func TestGetterFunctionEdgeCases(t *testing.T) {
+	// Test default values when config has zero values
+	runner := &Runner{
+		config: &cli.Config{
+			BaseDelay: 0,
+			Increment: 0,
+			Exponent:  0,
+			MaxDelay:  0,
+		},
+	}
+
+	assert.Equal(t, 1*time.Second, runner.getBaseDelay())
+	assert.Equal(t, 1*time.Second, runner.getIncrement())
+	assert.Equal(t, 2.0, runner.getExponent())
+	assert.Equal(t, 60*time.Second, runner.getMaxDelay())
+
+	// Test non-zero values
+	runner.config.BaseDelay = 3 * time.Second
+	runner.config.Increment = 2 * time.Second
+	runner.config.Exponent = 1.5
+	runner.config.MaxDelay = 30 * time.Second
+
+	assert.Equal(t, 3*time.Second, runner.getBaseDelay())
+	assert.Equal(t, 2*time.Second, runner.getIncrement())
+	assert.Equal(t, 1.5, runner.getExponent())
+	assert.Equal(t, 30*time.Second, runner.getMaxDelay())
+}

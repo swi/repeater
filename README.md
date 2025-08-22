@@ -33,6 +33,8 @@ cd repeater
 go build -o rpr ./cmd/rpr
 ```
 
+> 📚 **For detailed installation instructions and troubleshooting**, see [USAGE.md - Installation](USAGE.md#installation)
+
 ### Basic Usage
 ```bash
 # Monitor API every 30 seconds for 10 times
@@ -47,6 +49,8 @@ rpr i -e 10s -t 5 -- curl -s https://api.com | jq -r '.status'
 # Count successful responses
 rpr i -e 5s -t 20 -- curl -s https://api.com | grep -c "success"
 ```
+
+> 💡 **Want more examples?** See [USAGE.md](USAGE.md) for comprehensive CLI examples and real-world use cases
 
 ## Core Usage Examples
 
@@ -73,6 +77,8 @@ rpr rate-limit --rate 100/1h -- curl https://api.github.com/user
 # HTTP-aware intelligence (respects Retry-After headers)
 rpr i -e 30s --http-aware -- curl -s https://api.example.com
 ```
+
+> 🔧 **Advanced Configuration:** Learn about [HTTP-aware intelligence](USAGE.md#http-aware-intelligence), [pattern matching](USAGE.md#pattern-matching), and [configuration files](USAGE.md#configuration) in the Usage Guide
 
 ### Pattern Matching
 ```bash
@@ -105,15 +111,27 @@ rpr i -e 5s -t 10 --stats-only -- ./performance-test.sh
 
 ## Documentation
 
-- **[Usage Guide](USAGE.md)** - Comprehensive CLI reference and examples
-- **[Architecture](ARCHITECTURE.md)** - Technical design and implementation details
-- **[Contributing](CONTRIBUTING.md)** - Development guide and TDD workflow
-- **[Features](FEATURES.md)** - Feature roadmap and future plans
-- **[Changelog](CHANGELOG.md)** - Version history and release notes
+### User Guides
+- 📖 **[Usage Guide](USAGE.md)** - Complete CLI reference, examples, and real-world use cases
+- ⚙️ **[Configuration Guide](USAGE.md#configuration)** - TOML files, environment variables, and advanced setup
 
-## Status: Production Ready ✅
+### Technical Documentation  
+- 🏗️ **[Architecture](ARCHITECTURE.md)** - System design, components, and performance characteristics
+- 📋 **[Feature Roadmap](FEATURES.md)** - Implementation status and future enhancements
 
-**Current Version**: v0.5.0 (Production Ready - Excellent Quality)
+### Development
+- 🤝 **[Contributing Guide](CONTRIBUTING.md)** - TDD workflow, code standards, and plugin development
+- 📝 **[Changelog](CHANGELOG.md)** - Version history and migration guides
+
+### Quick Links
+- 🚀 [Basic Usage Examples](USAGE.md#core-usage-examples)
+- 🧠 [Advanced Scheduling](USAGE.md#advanced-scheduling) 
+- 🔌 [Plugin Development](CONTRIBUTING.md#plugin-development)
+- 🐛 [Troubleshooting](USAGE.md#troubleshooting)
+
+## Status:
+
+**Current Version**: v0.5.1
 
 ### Fully Implemented & Tested
 - ✅ **Complete CLI** with multi-level abbreviations and intuitive UX
@@ -123,7 +141,7 @@ rpr i -e 5s -t 10 --stats-only -- ./performance-test.sh
 - ✅ **Pattern Matching** with regex success/failure detection and precedence
 - ✅ **Unix Pipeline Integration** with clean output and proper exit codes
 - ✅ **Production Features** (metrics, health endpoints, signal handling, recovery)
-- ✅ **Comprehensive Testing** (210+ tests, 90%+ coverage, benchmarks, race testing)
+- ✅ **Decent Testing** (210+ tests, 90%+ coverage, benchmarks, race testing)
 
 ### Quality Metrics
 - **Test Coverage**: 90%+ across all packages

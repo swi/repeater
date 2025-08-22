@@ -124,7 +124,7 @@ func (h *HealthServer) healthHandler(w http.ResponseWriter, r *http.Request) {
 	response := HealthResponse{
 		Status:    "healthy",
 		Timestamp: time.Now(),
-		Version:   "0.3.0",
+		Version:   "0.5.1",
 		Uptime:    time.Since(h.startTime),
 		Metrics:   h.stats,
 	}

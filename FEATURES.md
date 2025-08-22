@@ -43,6 +43,9 @@ This document outlines current features, completed development cycles, immediate
 - **Linear Strategy**: Predictable incremental retry (1s, 2s, 3s, 4s, 5s...)
 - **Polynomial Strategy**: Customizable growth with configurable exponent
 - **Decorrelated Jitter**: AWS-recommended distributed retry algorithm
+
+> 📖 **Usage Examples:** See [Mathematical Retry Strategies](USAGE.md#advanced-scheduling) for practical examples and configuration options
+> 🏗️ **Implementation:** See [Scheduling Algorithms](ARCHITECTURE.md#advanced-scheduling-algorithms) for technical details
 - **Legacy Backoff**: Preserved for backward compatibility (maps to exponential)
 
 ### HTTP-Aware Intelligence

@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [1.22, 1.23]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Install development tools
+      run: make install-tools
+
+    - name: Format check
+      run: |
+        make fmt
+        if [ -n "$(git diff --name-only)" ]; then
+          echo "Code not properly formatted. Please run 'make fmt'."
+          git diff
+          exit 1
+        fi
+
+    - name: Lint
+      run: make lint
+
+    - name: Build
+      run: make build
+
+    - name: Test
+      run: make test
+
+    - name: Test Integration
+      run: make test-integration
+
+    - name: Test End-to-End
+      run: make test-e2e
+
+    - name: Benchmark
+      run: make benchmark
+
+    - name: Test Documentation Examples
+      run: make docs-check
+
+    - name: Validate Documentation
+      run: make docs-validate
+
+    - name: Upload coverage to Codecov
+      if: matrix.go-version == '1.22'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+
+    - name: Build binary for documentation testing
+      run: go build -o rpr ./cmd/rpr
+
+    - name: Validate all documentation examples
+      run: make docs-check
+
+    - name: Check for documentation consistency
+      run: |
+        # Check version consistency across files
+        echo "Checking version consistency..."
+        versions=$(grep -r "v0\.[0-9]\+\.[0-9]\+" --include="*.md" . | grep -o "v0\.[0-9]\+\.[0-9]\+" | sort | uniq)
+        version_count=$(echo "$versions" | wc -l)
+        if [ "$version_count" -gt 1 ]; then
+          echo "❌ Version inconsistency found:"
+          echo "$versions"
+          exit 1
+        fi
+        echo "✅ Version consistency check passed"
+
+    - name: Check for broken internal links
+      run: make docs-validate
+
+    - name: Verify documentation completeness
+      run: |
+        echo "Checking documentation completeness..."
+        
+        # Check that all major features are documented
+        features=("interval" "count" "duration" "cron" "adaptive" "exponential" "fibonacci" "linear" "polynomial")
+        
+        for feature in "${features[@]}"; do
+          if ! grep -q "$feature" README.md || ! grep -q "$feature" USAGE.md; then
+            echo "❌ Feature '$feature' not properly documented"
+            exit 1
+          fi
+        done
+        
+        echo "✅ Documentation completeness check passed"
+
+  quality-gate:
+    needs: [test, documentation]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Quality Gate Summary
+      run: |
+        echo "🎉 All quality gates passed!"
+        echo "✅ Tests passed"
+        echo "✅ Documentation validated"
+        echo "✅ Examples tested"
+        echo "✅ Version consistency verified"

@@ -37,11 +37,25 @@ func NewHTTPAwareSchedulerWithConfig(config HTTPAwareConfig) HTTPAwareScheduler 
 
 // Next returns a channel that will send the next execution time
 func (s *httpAwareScheduler) Next() <-chan time.Time {
-	// Note: Current implementation uses NextDelay() for timing and integrates
-	// with execution loop. Full channel-based scheduling is in backlog.
-	if s.fallbackScheduler != nil {
-		return s.fallbackScheduler.Next()
+	if s.stopped {
+		return s.nextCh
 	}
+
+	// Calculate the delay based on HTTP timing or fallback
+	delay := s.NextDelay()
+
+	// Send the next execution time after the calculated delay
+	go func() {
+		<-time.After(delay)
+		if !s.stopped {
+			select {
+			case s.nextCh <- time.Now():
+			default:
+				// Channel is full, skip this tick
+			}
+		}
+	}()
+
 	return s.nextCh
 }
 
@@ -51,8 +65,15 @@ func (s *httpAwareScheduler) Stop() {
 	if s.fallbackScheduler != nil {
 		s.fallbackScheduler.Stop()
 	}
+
+	// Close the channel if it exists and is not already closed
 	if s.nextCh != nil {
-		close(s.nextCh)
+		select {
+		case <-s.nextCh:
+			// Channel already closed or has a value
+		default:
+			close(s.nextCh)
+		}
 	}
 }
 

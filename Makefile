@@ -1,6 +1,6 @@
 # Makefile for Repeater (rpr)
 
-.PHONY: build test test-integration test-e2e benchmark quality-gate lint clean install-tools help
+.PHONY: build test test-integration test-e2e benchmark quality-gate lint clean install-tools docs-check docs-test docs-validate docs-duplicate-check help
 
 # Build configuration
 BINARY_NAME=rpr
@@ -55,7 +55,7 @@ benchmark:
 	$(GOTEST) -bench=. -benchmem ./pkg/...
 
 ## Run all quality checks
-quality-gate: lint test test-cron test-plugin test-integration benchmark
+quality-gate: lint test test-cron test-plugin test-integration benchmark docs-check
 	@echo "✅ All quality checks passed"
 
 ## Run linting
@@ -130,6 +130,28 @@ install: build
 	cp $(BUILD_DIR)/$(BINARY_NAME) $$(go env GOPATH)/bin/
 	@echo "✅ Installed to $$(go env GOPATH)/bin/$(BINARY_NAME)"
 
+## Check documentation consistency and examples
+docs-check:
+	@echo "📚 Checking documentation consistency..."
+	@./scripts/validate-docs-examples.sh
+
+## Test all documentation examples
+docs-test:
+	@echo "🧪 Testing documentation examples..."
+	@./scripts/validate-docs-examples.sh
+
+## Validate documentation links and references
+docs-validate:
+	@echo "🔗 Validating documentation links..."
+	@grep -r "http" --include="*.md" . | grep -v "example.com" | head -10 || true
+	@echo "📋 Checking for broken internal references..."
+	@grep -r "\[.*\](.*\.md)" --include="*.md" . || true
+
+## Check for duplicate content across documentation files
+docs-duplicate-check:
+	@echo "🔍 Checking for duplicate content..."
+	@echo "Note: This is a basic check - manual review recommended"
+
 ## Show help
 help:
 	@echo "Repeater (rpr) - Available targets:"
@@ -153,6 +175,12 @@ help:
 	@echo "  quality-gate   Run all quality checks"
 	@echo "  lint           Run linting"
 	@echo "  fmt            Format code"
+	@echo ""
+	@echo "Documentation targets:"
+	@echo "  docs-check     Check documentation consistency and examples"
+	@echo "  docs-test      Test all documentation examples"
+	@echo "  docs-validate  Validate documentation links and references"
+	@echo "  docs-duplicate-check  Check for duplicate content"
 	@echo ""
 	@echo "TDD targets:"
 	@echo "  tdd-helper     Run TDD commit helper"

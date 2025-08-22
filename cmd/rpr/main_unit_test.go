@@ -116,9 +116,9 @@ func TestShowVersion(t *testing.T) {
 	outputStr := string(output)
 
 	// Verify version output format
-	assert.Contains(t, outputStr, "rpr version 0.5.0")
+	assert.Contains(t, outputStr, "rpr version 0.5.1")
 	assert.True(t, strings.HasPrefix(outputStr, "rpr version"))
-	assert.True(t, strings.HasSuffix(strings.TrimSpace(outputStr), "0.5.0"))
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(outputStr), "0.5.1"))
 }
 
 // TestShowExecutionResults tests the showExecutionResults function

@@ -255,6 +255,8 @@ go test -bench=. ./...
 - **Configuration**: TOML files with environment variable overrides
 - **Pattern Matching**: Regex-based success/failure detection with precedence rules
 
+> 🏗️ **Deep Dive:** For detailed technical implementation of these patterns, see [Architecture Guide](ARCHITECTURE.md). For usage examples, see [Usage Guide](USAGE.md).
+
 ## Plugin Development
 
 ### Creating Custom Plugins
@@ -545,6 +547,20 @@ echo "✅ All quality checks passed - commit approved"
 - **[Usage Guide](USAGE.md)** for CLI reference
 - **[Features Roadmap](FEATURES.md)** for planned development
 - **[Changelog](CHANGELOG.md)** for version history
+
+## See Also
+
+### Documentation for Contributors
+- 📖 **[README.md](README.md)** - Project overview and contribution motivation
+- 🏗️ **[ARCHITECTURE.md](ARCHITECTURE.md)** - Deep technical understanding for development
+- 📚 **[USAGE.md](USAGE.md)** - User experience perspective for feature development
+- 📋 **[FEATURES.md](FEATURES.md)** - Implementation status and priority guidance
+
+### Development Resources
+- 🌐 **[Project Repository](https://github.com/swi/repeater)** - Issues, discussions, and pull requests
+- 🔧 **[Development Setup](CONTRIBUTING.md#development-environment)** - Complete environment configuration
+- 🧪 **[TDD Methodology](CONTRIBUTING.md#tdd-workflow-mandatory)** - Test-driven development workflow
+- 📝 **[Documentation Standards](CONTRIBUTING.md#documentation-standards-mandatory)** - Maintaining quality documentation
 
 ## License
 
