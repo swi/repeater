@@ -11,6 +11,7 @@ import (
 	"github.com/swi/repeater/pkg/executor"
 	"github.com/swi/repeater/pkg/httpaware"
 	"github.com/swi/repeater/pkg/interfaces"
+	"github.com/swi/repeater/pkg/patterns"
 )
 
 // ExecutionEngine handles the core execution loop and statistics
@@ -18,6 +19,7 @@ type ExecutionEngine struct {
 	config             *cli.Config
 	httpAwareScheduler httpaware.HTTPAwareScheduler
 	executor           *executor.Executor
+	patternMatcher     *patterns.PatternMatcher
 }
 
 // NewExecutionEngine creates a new execution engine
@@ -27,10 +29,25 @@ func NewExecutionEngine(config *cli.Config, httpAwareScheduler httpaware.HTTPAwa
 		return nil, fmt.Errorf("failed to create executor: %w", err)
 	}
 
+	// Create pattern matcher if patterns are configured
+	var patternMatcher *patterns.PatternMatcher
+	if config.SuccessPattern != "" || config.FailurePattern != "" {
+		matcher, err := patterns.NewPatternMatcher(patterns.PatternConfig{
+			SuccessPattern:  config.SuccessPattern,
+			FailurePattern:  config.FailurePattern,
+			CaseInsensitive: config.CaseInsensitive,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create pattern matcher: %w", err)
+		}
+		patternMatcher = matcher
+	}
+
 	return &ExecutionEngine{
 		config:             config,
 		httpAwareScheduler: httpAwareScheduler,
 		executor:           exec,
+		patternMatcher:     patternMatcher,
 	}, nil
 }
 
@@ -74,8 +91,13 @@ func (e *ExecutionEngine) ExecuteWithScheduler(ctx context.Context, scheduler in
 
 			// Process result for HTTP-aware scheduling
 			if e.httpAwareScheduler != nil {
-				// TODO: Pass execution result to HTTP-aware scheduler for timing adjustments
-				_ = result
+				// Pass execution result to HTTP-aware scheduler for timing adjustments
+				if result.Stdout != "" {
+					e.httpAwareScheduler.SetLastResponse(result.Stdout)
+				} else if result.Stderr != "" {
+					// Fallback to stderr for HTTP error responses
+					e.httpAwareScheduler.SetLastResponse(result.Stderr)
+				}
 			}
 
 			// Check for pattern matching
@@ -150,8 +172,23 @@ func (e *ExecutionEngine) updateStats(stats *ExecutionStats, result *executor.Ex
 
 // checkPatternMatch checks if the result matches success/failure patterns
 func (e *ExecutionEngine) checkPatternMatch(result *executor.ExecutionResult) bool {
-	// For now, use exit code as success indicator
-	// TODO: Implement actual pattern matching logic
+	// If pattern matcher is configured, use it for evaluation
+	if e.patternMatcher != nil {
+		// Combine stdout and stderr for pattern matching
+		output := result.Stdout
+		if result.Stderr != "" {
+			if output != "" {
+				output += "\n" + result.Stderr
+			} else {
+				output = result.Stderr
+			}
+		}
+
+		evalResult := e.patternMatcher.EvaluateResult(output, result.ExitCode)
+		return evalResult.Success
+	}
+
+	// Fall back to exit code as success indicator
 	return result.ExitCode == 0
 }
 
