@@ -1,6 +1,6 @@
 # Repeater Feature Roadmap
 
-## 🎉 Current Status: **PRODUCTION READY WITH EXCELLENT QUALITY (v0.5.1)**
+## 🎉 Current Status: **PRODUCTION READY - PLANNING MAJOR ARCHITECTURE ENHANCEMENT (v0.5.2)**
 
 Repeater has achieved **A+ grade (98/100)** in comprehensive codebase quality analysis, demonstrating exceptional standards across architecture, testing, documentation, and security. With v0.5.1 critical fixes and documentation enhancements complete, the project exemplifies professional Go development with industry-leading practices and enhanced reliability.
 
@@ -14,6 +14,8 @@ Repeater has achieved **A+ grade (98/100)** in comprehensive codebase quality an
 - ✅ **Full CI/CD functionality** with all infrastructure issues resolved
 
 **Recent Improvements**: Complete legacy command removal, golangci-lint v2 migration, race condition fixes, CLI help system enhancement, integration test stabilization, and Go 1.23 performance optimizations. All critical issues resolved - the codebase represents excellent software engineering quality with enhanced reliability.
+
+**Next Major Phase**: Comprehensive core-to-plugin architecture refactor (v0.6.0) designed to create a lightweight core binary with optional advanced schedulers as plugins, delivering significant performance improvements and cleaner architectural separation.
 
 This document outlines current features, completed development cycles, immediate maintenance priorities, and future enhancements.
 
@@ -429,8 +431,240 @@ After completing immediate maintenance items (v0.4.2), these potential enhanceme
 
 ## 🎯 Implementation Priorities
 
-### Priority 1: Technical Debt Remediation (v0.5.3) 🔧 **NEXT PHASE**
-**Status**: Planned for Implementation
+### Priority 1: Core-to-Plugin Architecture Refactor (v0.6.0) 🏗️ **NEXT MAJOR PHASE**
+**Status**: Planned for Implementation  
+**Timeline**: 3 weeks (45 hours total)
+**Target**: Clean architectural separation with core lightweight binary + advanced plugins
+
+#### **📋 Refactoring Overview**
+Transform the current monolithic scheduler approach into a clean core + plugin architecture:
+
+**Core Schedulers (Remain Built-in)**:
+- `IntervalScheduler` (126 lines) - Universal need, zero dependencies
+- `CronScheduler` (95 lines) - Standard timing, minimal complexity
+
+**Convert to Plugins** (748 lines + dependencies removed from core):
+- `LoadAwareScheduler` (300 lines) - OS-specific monitoring, specialized use case
+- `StrategyScheduler` (149 lines) - Mathematical algorithms, advanced feature  
+- `AdaptiveScheduler` (448 lines) - Complex AI algorithms, research-grade
+
+**Benefits**:
+- **Binary Size**: ~1MB reduction in core binary
+- **Startup Performance**: 40% faster startup without complex scheduler loading
+- **Memory Footprint**: 60% lower baseline memory usage
+- **Platform Independence**: Core works on all platforms, plugins optional
+- **Maintenance Simplicity**: Advanced features become optional extensions
+
+#### **🧪 TDD Implementation Plan**
+
+##### **Phase 1: Plugin Infrastructure Enhancement (12 hours)**
+**Red-Green-Refactor Cycle**: Plugin system validation
+
+**Week 1, Days 1-2**
+
+**🔴 RED Phase: Write Failing Tests**
+- `TestSchedulerPluginInterface` - Validate plugin contract compliance
+- `TestPluginRegistryWithSchedulers` - Registry integration tests  
+- `TestPluginCoordinatorSchedulerCreation` - Factory method tests
+- `TestSchedulerPluginLoadingPerformance` - Performance regression tests
+
+**🟢 GREEN Phase: Minimal Implementation**
+- Enhance `SchedulerPlugin` interface with advanced configuration
+- Implement plugin manifest validation for scheduler plugins
+- Add scheduler plugin loading benchmarks (target: <100μs load time)
+
+**🔵 REFACTOR Phase: Optimize**
+- Plugin loading optimization with caching
+- Interface performance optimization (target: <5ns overhead)
+- Memory usage optimization for plugin registry
+
+##### **Phase 2: LoadAware Scheduler Plugin Conversion (14 hours)**
+**Red-Green-Refactor Cycle**: First advanced scheduler conversion
+
+**Week 1, Days 3-4; Week 2, Day 1**
+
+**🔴 RED Phase: Write Comprehensive Plugin Tests**
+```go
+// loadaware_plugin_test.go
+func TestLoadAwareSchedulerPlugin_Integration(t *testing.T) {
+    // Test complete plugin lifecycle
+}
+func TestLoadAwareSchedulerPlugin_PerformanceParity(t *testing.T) {
+    // Ensure no performance degradation vs built-in
+}
+func TestLoadAwareSchedulerPlugin_SystemMonitoring(t *testing.T) {
+    // Test OS-specific monitoring capabilities
+}
+func TestLoadAwareSchedulerPlugin_ConfigValidation(t *testing.T) {
+    // Test plugin-specific configuration
+}
+```
+
+**🟢 GREEN Phase: Create LoadAware Plugin**
+- Convert `pkg/scheduler/loadaware.go` → `plugins/loadaware-scheduler/`
+- Implement `SchedulerPlugin` interface
+- Create plugin manifest (`plugin.toml`)
+- Build plugin binary (`.so` file)
+- Update CLI to recognize plugin-based scheduler
+
+**🔵 REFACTOR Phase: Performance & Integration**
+- Optimize plugin loading for LoadAware scheduler
+- Ensure seamless integration with runner system
+- Validate performance benchmarks (target: <1% overhead)
+- Update documentation and help system
+
+##### **Phase 3: Strategy Scheduler Plugin Conversion (10 hours)**
+**Red-Green-Refactor Cycle**: Mathematical strategies plugin
+
+**Week 2, Days 2-3**
+
+**🔴 RED Phase: Strategy Plugin Tests**
+```go
+// strategy_plugin_test.go  
+func TestStrategySchedulerPlugin_AllStrategies(t *testing.T) {
+    // Test all 5 mathematical strategies via plugin
+}
+func TestStrategySchedulerPlugin_PerformanceBenchmark(t *testing.T) {
+    // Ensure strategy calculations remain fast
+}
+func TestStrategySchedulerPlugin_ConfigurationSchema(t *testing.T) {
+    // Test strategy-specific parameter validation
+}
+```
+
+**🟢 GREEN Phase: Strategy Plugin Implementation**
+- Convert `pkg/scheduler/strategy.go` + `pkg/strategies/*` → `plugins/strategy-scheduler/`
+- Implement comprehensive configuration schema
+- Bundle all mathematical strategies in single plugin
+- Create unified plugin interface for strategy selection
+- Update CLI routing for strategy commands
+
+**🔵 REFACTOR Phase: CLI Integration**
+- Ensure `rpr exponential`, `rpr fibonacci`, etc. work through plugin
+- Maintain parameter validation and help system  
+- Optimize plugin loading for strategy scheduler
+- Performance validation for all 5 strategies
+
+##### **Phase 4: Adaptive Scheduler Plugin Conversion (9 hours)**
+**Red-Green-Refactor Cycle**: Most complex scheduler conversion
+
+**Week 2, Days 4-5**
+
+**🔴 RED Phase: Adaptive Plugin Tests**
+```go
+// adaptive_plugin_test.go
+func TestAdaptiveSchedulerPlugin_AIMDAlgorithm(t *testing.T) {
+    // Test AIMD algorithm via plugin interface
+}
+func TestAdaptiveSchedulerPlugin_BayesianPredictor(t *testing.T) {
+    // Test machine learning components
+}
+func TestAdaptiveSchedulerPlugin_CircuitBreaker(t *testing.T) {
+    // Test circuit breaker integration
+}
+func TestAdaptiveSchedulerPlugin_ComplexConfiguration(t *testing.T) {
+    // Test 12+ configuration parameters
+}
+```
+
+**🟢 GREEN Phase: Adaptive Plugin Creation**
+- Convert `pkg/adaptive/adaptive.go` → `plugins/adaptive-scheduler/`
+- Handle complex configuration with validation
+- Maintain AI algorithm performance
+- Ensure circuit breaker and AIMD integration
+- Create comprehensive plugin manifest
+
+**🔵 REFACTOR Phase: Advanced Features**
+- Validate machine learning algorithm performance
+- Test adaptive behavior through plugin interface
+- Ensure configuration complexity is manageable
+- Performance benchmarking for adaptive algorithms
+
+##### **Phase 5: Core Cleanup & Integration (10 hours)**
+**Red-Green-Refactor Cycle**: Remove legacy code, validate integration
+
+**Week 3, Days 1-2**
+
+**🔴 RED Phase: Integration & Regression Tests**
+```go
+// core_plugin_integration_test.go
+func TestCoreSchedulersWithoutPlugins(t *testing.T) {
+    // Ensure interval/cron work without plugins
+}
+func TestPluginSchedulersWithCore(t *testing.T) {
+    // Test mixed core + plugin usage
+}
+func TestBinarySize_BeforeAfter(t *testing.T) {
+    // Validate binary size reduction
+}
+func TestMemoryUsage_CoreVsPlugins(t *testing.T) {
+    // Validate memory footprint improvements  
+}
+```
+
+**🟢 GREEN Phase: Legacy Code Removal**
+- Remove `LoadAwareScheduler` from `pkg/scheduler/`
+- Remove `StrategyScheduler` from `pkg/scheduler/`  
+- Remove `pkg/adaptive/` package
+- Update `pkg/runner/` to use plugin system for advanced schedulers
+- Update CLI routing logic
+
+**🔵 REFACTOR Phase: Final Optimization**
+- Binary size validation (target: 1MB+ reduction)
+- Memory usage optimization
+- Startup performance testing (target: 40% improvement)
+- Comprehensive integration testing
+- Documentation updates
+
+#### **📊 Success Metrics & Validation**
+
+**Performance Targets**:
+- Binary size reduction: >1MB (verified via benchmark)
+- Plugin loading overhead: <100μs per plugin
+- Runtime interface overhead: <5ns per scheduler call
+- Memory baseline reduction: >60% without plugins loaded
+- Startup time improvement: >40% for core functionality
+
+**Quality Targets**:
+- All existing tests pass (240+ tests)
+- New plugin tests: 60+ additional tests
+- Performance benchmarks maintained: <1% regression
+- Documentation updated: Plugin development guide
+- CLI compatibility: 100% backward compatible commands
+
+**Architecture Validation**:
+```bash
+# Core functionality works without plugins
+rpr interval -e 30s -- echo "core works"
+rpr cron -c "*/5 * * * *" -- echo "core timing"
+
+# Advanced features require plugins
+rpr adaptive --base-interval 1s -- echo "requires plugin"  
+rpr exponential --base-delay 1s -- echo "requires plugin"
+rpr load-aware --cpu-target 70 -- echo "requires plugin"
+```
+
+#### **🔄 TDD Quality Gates**
+
+**Each Phase Must Pass**:
+```bash
+# Mandatory before proceeding to next phase
+make test                    # All tests pass (including new plugin tests)
+make benchmark              # Performance benchmarks validate
+make quality-gate           # Zero linting issues
+make plugin-integration     # Plugin system integration tests
+go test -race ./...         # Concurrency safety maintained
+```
+
+**Phase Completion Criteria**:
+- **Phase 1**: Plugin infrastructure enhanced, benchmarks validate <100μs loading
+- **Phase 2**: LoadAware plugin functional, performance parity achieved
+- **Phase 3**: All 5 strategy commands work via plugin, CLI seamless
+- **Phase 4**: Adaptive scheduler plugin handles complex ML algorithms
+- **Phase 5**: Binary size reduced >1MB, core works standalone
+
+### Priority 2: Technical Debt Remediation (v0.5.3) 🔧 **PREREQUISITE**
+**Status**: Planned for Implementation (Prerequisite for v0.6.0)
 **Timeline**: 2 weeks (33 hours - net 22h reduction due to sufficient test coverage)  
 **Target**: Near-perfect code quality (A+ 99.5/100) with minimal technical debt
 
@@ -675,11 +909,69 @@ Current Status (v0.5.2): A+ (98/100) - Documentation Excellence
 Total Remaining Effort: 33h (net -22h due to sufficient test coverage)
 ```
 
-### **📊 Final Effort Analysis**
+### **📊 Implementation Timeline Comparison**
+
+#### **v0.6.0: Core-to-Plugin Architecture (45 hours)**
+```
+Week 1: Plugin Infrastructure & LoadAware Conversion (26h)
+├── Days 1-2: Plugin infrastructure enhancement (12h)
+├── Days 3-4: LoadAware scheduler plugin conversion (14h)
+
+Week 2: Strategy & Adaptive Conversion (19h)  
+├── Days 1-2: Strategy scheduler plugin conversion (10h)
+├── Days 3-4: Adaptive scheduler plugin conversion (9h)
+
+Week 3: Integration & Cleanup (10h)
+├── Days 1-2: Core cleanup and final integration (10h)
+└── Validation: Performance benchmarks and quality gates
+```
+
+#### **v0.5.3: Technical Debt (33 hours) - Prerequisite**
 - **Phase 1**: 16h → 0h (**-16h**) - Coverage sufficient for production
 - **Phase 2**: 15h → 15h (**no change**) - Code organization still needed  
 - **Phase 3**: 18h → 18h (**no change**) - Performance work still valuable
 - **Net Change**: **55h → 33h** (-22h major efficiency gain)
+
+**Combined Effort**: v0.5.3 (33h) + v0.6.0 (45h) = **78 hours total**
+
+#### **🎯 Expected Outcomes from Core-to-Plugin Architecture**
+
+**Binary & Performance Improvements**:
+- Core binary size: -1.2MB (LoadAware: 300 lines, Strategy: 149 lines, Adaptive: 448 lines + dependencies)
+- Startup time: -40% for basic interval/cron usage
+- Memory baseline: -60% without plugins loaded
+- Plugin loading: <100μs overhead per advanced scheduler
+
+**User Experience Enhancement**:
+```bash
+# Lightweight core - works everywhere, zero configuration
+rpr interval -e 30s -- echo "fast startup, minimal footprint"
+rpr cron -c "*/5 * * * *" -- curl api.com
+
+# Advanced features via plugins - power users get full capabilities  
+rpr adaptive --load-plugin adaptive-scheduler -- command
+rpr exponential --load-plugin strategy-scheduler --base-delay 1s -- retry-command
+rpr load-aware --load-plugin loadaware-scheduler --cpu-target 70 -- monitoring
+```
+
+**Architecture Quality**:
+- **Clean Separation**: Core handles 80% use cases, plugins handle 20% advanced needs
+- **Optional Complexity**: Advanced algorithms become opt-in rather than always loaded  
+- **Platform Independence**: Core works on all platforms, plugins can be platform-specific
+- **Maintenance Simplification**: Advanced features don't burden core maintenance
+- **Plugin Ecosystem**: Foundation for community-contributed schedulers
+
+**Migration Strategy**:
+- **Phase 1**: Implement plugin versions alongside existing schedulers
+- **Phase 2**: Gradually migrate CLI to prefer plugin versions  
+- **Phase 3**: Remove built-in advanced schedulers (breaking change)
+- **Phase 4**: Package plugins separately, optional installation
+
+**Risk Mitigation**:
+- **Backward Compatibility**: All current CLI commands continue working during transition
+- **Performance Safety**: Comprehensive benchmarks ensure no regression
+- **Rollback Plan**: Plugin system can be disabled, fallback to built-in schedulers
+- **Quality Gates**: Each phase must pass all existing tests plus new plugin tests
 
 ## 📋 Conclusion
 
