@@ -8,6 +8,8 @@ import (
 )
 
 func TestPatternMatcher_BasicSuccessPattern(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		successPattern string
@@ -58,6 +60,8 @@ func TestPatternMatcher_BasicSuccessPattern(t *testing.T) {
 }
 
 func TestPatternMatcher_BasicFailurePattern(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		failurePattern string
@@ -151,6 +155,8 @@ func TestPatternMatcher_NoPatterns(t *testing.T) {
 }
 
 func TestPatternMatcher_CaseInsensitive(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		pattern         string
